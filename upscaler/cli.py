@@ -136,7 +136,7 @@ def _simple(args: argparse.Namespace) -> int:
         simple_args = argparse.Namespace(
             input=source,
             output=output,
-            profile="clean",
+            profile="compressed",
             target=None,
             outscale=outscale,
             tile=256,

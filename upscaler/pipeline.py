@@ -70,6 +70,23 @@ def _find_result(directory: Path) -> Path:
     return candidates[0]
 
 
+def _even_output_scale(width: int, height: int, requested: float) -> float:
+    """Keep the Real-ESRGAN intermediate dimensions compatible with libx264."""
+    scale = requested
+    while True:
+        output_width = int(width * scale)
+        output_height = int(height * scale)
+        if output_width % 2 == 0 and output_height % 2 == 0:
+            return scale
+
+        candidates: list[float] = []
+        if output_width % 2:
+            candidates.append((output_width - 1) / width)
+        if output_height % 2:
+            candidates.append((output_height - 1) / height)
+        scale = min(candidates)
+
+
 def _run_realesrgan(
     source: Path,
     output_dir: Path,
@@ -207,6 +224,7 @@ def upscale(options: UpscaleOptions) -> UpscaleResult:
             outscale = 4.0
         if outscale <= 0:
             raise PipelineError("outscale deve ser maior que zero")
+        outscale = _even_output_scale(prepared_width, prepared_height, outscale)
 
         last_error: BaseException | None = None
         processed: Path | None = None

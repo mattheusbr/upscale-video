@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from .media import MediaError, inspect_video, resolve_binary
-from .models import PROFILES
+from .models import PROFILES, SIMPLE_LEVELS
 from .pipeline import PipelineError, UpscaleOptions, ensure_output_dir, upscale
 
 
@@ -125,6 +125,45 @@ def _run(args: argparse.Namespace, seconds: float | None = None) -> int:
     return 0
 
 
+def _simple(args: argparse.Namespace) -> int:
+    source = Path(args.input).expanduser().resolve()
+    try:
+        metadata = inspect_video(source, args.ffprobe_bin)
+        target_long_edge = SIMPLE_LEVELS[args.nivel]
+        source_long_edge = max(metadata.width, metadata.height)
+        outscale = max(1.0, min(4.0, target_long_edge / source_long_edge))
+        output = source.with_name(f"{source.stem}_upscaled_{args.nivel}{source.suffix}")
+        simple_args = argparse.Namespace(
+            input=source,
+            output=output,
+            profile="clean",
+            target=None,
+            outscale=outscale,
+            tile=256,
+            tile_pad=10,
+            denoise=None,
+            fp32=False,
+            no_auto_tile=False,
+            allow_vfr=False,
+            ffmpeg_bin=args.ffmpeg_bin,
+            ffprobe_bin=args.ffprobe_bin,
+            realesrgan_dir=args.realesrgan_dir,
+            python_executable=args.python_executable,
+            crf=17,
+            preset="slow",
+            audio_bitrate="192k",
+        )
+        print(
+            f"Nível {args.nivel}: {metadata.width}x{metadata.height} -> "
+            f"aproximadamente {int(metadata.width * outscale)}x{int(metadata.height * outscale)}",
+            flush=True,
+        )
+        return _run(simple_args)
+    except (MediaError, PipelineError, ValueError) as exc:
+        print(f"Erro: {exc}", file=sys.stderr)
+        return 2
+
+
 def _benchmark(args: argparse.Namespace) -> int:
     output_dir = ensure_output_dir(args.output_dir)
     profiles = args.profiles or sorted(PROFILES)
@@ -179,6 +218,15 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("output")
     _add_common_options(run)
     run.set_defaults(handler=lambda args: _run(args))
+
+    simple = subparsers.add_parser("simple", help="Processa um vídeo usando apenas um nível de qualidade")
+    simple.add_argument("input")
+    simple.add_argument("--nivel", choices=sorted(SIMPLE_LEVELS), default="medio")
+    simple.add_argument("--ffmpeg-bin", help="Caminho para ffmpeg.exe")
+    simple.add_argument("--ffprobe-bin", help="Caminho para ffprobe.exe")
+    simple.add_argument("--realesrgan-dir", type=Path, help="Diretório do checkout oficial do Real-ESRGAN")
+    simple.add_argument("--python-executable", default=sys.executable)
+    simple.set_defaults(handler=_simple)
 
     preview = subparsers.add_parser("preview", help="Processa somente uma janela curta para comparação")
     preview.add_argument("input")

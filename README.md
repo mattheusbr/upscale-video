@@ -20,6 +20,20 @@ Verifique a máquina:
 
 ## Uso
 
+Para um uso simples, informe apenas o vídeo e escolha o nível. A saída é criada
+na mesma pasta com o sufixo correspondente:
+
+```powershell
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --nivel baixo
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --nivel medio
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --nivel alto
+```
+
+Os níveis usam como referência o maior lado do vídeo: `baixo` até 1280 px,
+`medio` até 1920 px e `alto` até 3840 px (4K). O formato original nunca é
+recortado, a proporção é mantida e a resolução nunca é reduzida. Portanto, um
+vídeo que já ultrapasse 4K permanece na resolução original.
+
 Inspecionar o arquivo:
 
 ```powershell

@@ -30,6 +30,12 @@ PROFILES: dict[str, ModelProfile] = {
     ),
 }
 
+SIMPLE_LEVELS: dict[str, int] = {
+    "baixo": 1280,
+    "medio": 1920,
+    "alto": 3840,
+}
+
 
 def get_profile(name: str) -> ModelProfile:
     try:

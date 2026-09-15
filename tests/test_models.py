@@ -1,6 +1,6 @@
 import unittest
 
-from upscaler.models import get_profile, tile_candidates
+from upscaler.models import SIMPLE_LEVELS, get_profile, tile_candidates
 
 
 class ModelTests(unittest.TestCase):
@@ -14,6 +14,10 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(candidates[0], 256)
         self.assertEqual(len(candidates), len(set(candidates)))
         self.assertTrue(all(left >= right for left, right in zip(candidates, candidates[1:])))
+
+    def test_simple_levels_are_bounded_by_4k(self) -> None:
+        self.assertEqual(SIMPLE_LEVELS, {"baixo": 1280, "medio": 1920, "alto": 3840})
+        self.assertLessEqual(max(SIMPLE_LEVELS.values()), 3840)
 
 
 if __name__ == "__main__":

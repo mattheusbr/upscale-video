@@ -122,16 +122,27 @@ def _run_realesrgan(
     child_env = os.environ.copy()
     ffmpeg_directory = str(Path(ffmpeg_bin).resolve().parent)
     child_env["PATH"] = ffmpeg_directory + os.pathsep + child_env.get("PATH", "")
-    completed = subprocess.run(
+    process = subprocess.Popen(
         command,
         cwd=root,
         env=child_env,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
-        check=False,
+        bufsize=1,
     )
-    combined = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
-    if completed.returncode != 0:
+    output_chunks: list[str] = []
+    if process.stdout is not None:
+        while True:
+            chunk = process.stdout.read(256)
+            if not chunk:
+                break
+            output_chunks.append(chunk)
+            sys.stdout.write(chunk)
+            sys.stdout.flush()
+    returncode = process.wait()
+    combined = "".join(output_chunks)
+    if returncode != 0:
         raise PipelineError(combined.strip() or "Real-ESRGAN falhou sem mensagem")
     result = _find_result(output_dir)
     return result

@@ -112,6 +112,7 @@ def _inspect(args: argparse.Namespace) -> int:
 
 
 def _run(args: argparse.Namespace, seconds: float | None = None) -> int:
+    print("Processando vídeo...", flush=True)
     try:
         result = upscale(_options_from_args(args, seconds=seconds))
     except (PipelineError, ValueError) as exc:

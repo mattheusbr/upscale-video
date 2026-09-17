@@ -4,7 +4,30 @@ Ferramenta local para aumentar a resolução de vídeos com Real-ESRGAN e CUDA.
 
 Ela foi pensada para uso simples: você escolhe um nível de qualidade e o programa cuida do resto.
 
-## 1) Preparar o ambiente
+## 1) Repositórios e dependência do Real-ESRGAN
+
+Este projeto usa o fork do Real-ESRGAN como dependência externa via submodule:
+
+- projeto principal: https://github.com/mattheusbr/upscale-video
+- fork do Real-ESRGAN: https://github.com/mattheusbr/Real-ESRGAN
+- upstream original: https://github.com/xinntao/Real-ESRGAN
+
+Se você clonar este projeto do zero, o submodule precisa ser inicializado:
+
+```powershell
+git clone https://github.com/mattheusbr/upscale-video.git
+cd upscale-video
+git submodule update --init --recursive
+```
+
+Se você já clonou e quiser atualizar o submodule depois:
+
+```powershell
+git pull --recurse-submodules
+git submodule update --init --recursive
+```
+
+## 2) Preparar o ambiente
 
 No PowerShell, rode:
 
@@ -20,7 +43,7 @@ Para confirmar que tudo está funcionando:
 .\.venv\Scripts\python.exe -m upscaler doctor
 ```
 
-## 2) Uso rápido
+## 3) Uso rápido
 
 ### Modo simples (padrão)
 
@@ -93,7 +116,7 @@ Também funciona com um índice puro:
 .\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel medio --device 1
 ```
 
-## 3) Modo avançado
+## 4) Modo avançado
 
 Use `run` quando quiser controlar mais detalhes do processo:
 
@@ -112,7 +135,7 @@ Aqui você pode ajustar:
 
 Se quiser manter o formato original, não passe `--target`.
 
-## 4) Verificar o vídeo
+## 5) Verificar o vídeo
 
 Para inspecionar o arquivo antes de processar:
 
@@ -120,7 +143,7 @@ Para inspecionar o arquivo antes de processar:
 .\.venv\Scripts\python.exe -m upscaler inspect input.mp4
 ```
 
-## 5) Perfis principais
+## 6) Perfis principais
 
 Os perfis mais importantes do projeto são:
 
@@ -129,7 +152,7 @@ Os perfis mais importantes do projeto são:
 - `compressed`: `realesr-general-x4v3` para vídeo comprimido
 - `anime`: `realesr-animevideov3` para animação
 
-## 6) Benchmark
+## 7) Benchmark
 
 O benchmark testa um trecho curto do vídeo para comparar opções antes de processar o arquivo completo.
 
@@ -139,7 +162,7 @@ O benchmark testa um trecho curto do vídeo para comparar opções antes de proc
 
 Ele gera um relatório JSON na pasta indicada.
 
-## 7) Dicas de qualidade
+## 8) Dicas de qualidade
 
 - Use `max` para o melhor resultado geral em vídeo realista.
 - Use `compressed` para vídeos com artefatos/ruído.

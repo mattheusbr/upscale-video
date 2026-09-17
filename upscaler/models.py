@@ -17,6 +17,11 @@ PROFILES: dict[str, ModelProfile] = {
         model_name="RealESRGAN_x4plus",
         description="Live-action relativamente limpo; maior detalhe e textura.",
     ),
+    "max": ModelProfile(
+        key="max",
+        model_name="RealESRGAN_x4plus",
+        description="Qualidade máxima: usa o melhor modelo disponível em modo pesado e com encode cuidadoso.",
+    ),
     "compressed": ModelProfile(
         key="compressed",
         model_name="realesr-general-x4v3",
@@ -34,6 +39,7 @@ SIMPLE_LEVELS: dict[str, int] = {
     "baixo": 1280,
     "medio": 1920,
     "alto": 3840,
+    "max": 3840,
 }
 
 

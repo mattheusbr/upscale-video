@@ -44,6 +44,7 @@ def _add_common_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--crf", type=int, default=17, help="CRF final libx264; menor = maior qualidade/tamanho")
     parser.add_argument("--preset", default="slow", help="Preset libx264 final")
     parser.add_argument("--audio-bitrate", default="192k")
+    parser.add_argument("--no-audio", action="store_true", help="Não re-encoda nem preserva o áudio do vídeo final")
 
 
 def _options_from_args(args: argparse.Namespace, seconds: float | None = None, output: Path | None = None) -> UpscaleOptions:
@@ -67,6 +68,7 @@ def _options_from_args(args: argparse.Namespace, seconds: float | None = None, o
         crf=args.crf,
         preset=args.preset,
         audio_bitrate=args.audio_bitrate,
+        audio_enabled=not getattr(args, "no_audio", False),
     )
 
 
@@ -133,10 +135,16 @@ def _simple(args: argparse.Namespace) -> int:
         source_long_edge = max(metadata.width, metadata.height)
         outscale = max(1.0, min(4.0, target_long_edge / source_long_edge))
         output = source.with_name(f"{source.stem}_upscaled_{args.nivel}{source.suffix}")
+        model_to_profile = {
+            "RealESRGAN_x4plus": "clean",
+            "realesr-general-x4v3": "compressed",
+            "realesr-animevideov3": "anime",
+        }
+        profile_name = "max" if args.nivel == "max" and args.model == "RealESRGAN_x4plus" else model_to_profile[args.model]
         simple_args = argparse.Namespace(
             input=source,
             output=output,
-            profile="compressed",
+            profile=profile_name,
             target=None,
             outscale=outscale,
             tile=256,
@@ -151,13 +159,18 @@ def _simple(args: argparse.Namespace) -> int:
             python_executable=args.python_executable,
             crf=17,
             preset="slow",
-            audio_bitrate="192k",
+            audio_bitrate="320k",
+            no_audio=args.no_audio,
         )
         print(
             f"Nível {args.nivel}: {metadata.width}x{metadata.height} -> "
             f"aproximadamente {int(metadata.width * outscale)}x{int(metadata.height * outscale)}",
             flush=True,
         )
+        model_name = PROFILES[profile_name].model_name
+        print(f"Perfil: {profile_name} ({model_name})", flush=True)
+        if args.no_audio:
+            print("Áudio: sem processamento de áudio no arquivo final", flush=True)
         return _run(simple_args)
     except (MediaError, PipelineError, ValueError) as exc:
         print(f"Erro: {exc}", file=sys.stderr)
@@ -222,11 +235,54 @@ def build_parser() -> argparse.ArgumentParser:
     simple = subparsers.add_parser("simple", help="Processa um vídeo usando apenas um nível de qualidade")
     simple.add_argument("input")
     simple.add_argument("--nivel", choices=sorted(SIMPLE_LEVELS), default="medio")
+    simple.add_argument(
+        "--model",
+        choices=["RealESRGAN_x4plus", "realesr-general-x4v3", "realesr-animevideov3"],
+        default="RealESRGAN_x4plus",
+        help="Modelo do super-resolução; o padrão é RealESRGAN_x4plus",
+    )
     simple.add_argument("--ffmpeg-bin", help="Caminho para ffmpeg.exe")
     simple.add_argument("--ffprobe-bin", help="Caminho para ffprobe.exe")
     simple.add_argument("--realesrgan-dir", type=Path, help="Diretório do checkout oficial do Real-ESRGAN")
     simple.add_argument("--python-executable", default=sys.executable)
+    simple.add_argument("--no-audio", action="store_true", help="Não re-encoda nem preserva o áudio do vídeo final")
     simple.set_defaults(handler=_simple)
+
+    max_profile = subparsers.add_parser("max", help="Alias para qualidade máxima usando o melhor modelo disponível")
+    max_profile.add_argument("input")
+    max_profile.add_argument("output")
+    max_profile.add_argument("--tile", type=int, default=256)
+    max_profile.add_argument("--ffmpeg-bin", help="Caminho para ffmpeg.exe")
+    max_profile.add_argument("--ffprobe-bin", help="Caminho para ffprobe.exe")
+    max_profile.add_argument("--realesrgan-dir", type=Path, help="Diretório do checkout oficial do Real-ESRGAN")
+    max_profile.add_argument("--python-executable", default=sys.executable)
+    max_profile.add_argument("--crf", type=int, default=17)
+    max_profile.add_argument("--preset", default="slow")
+    max_profile.add_argument("--audio-bitrate", default="320k")
+    max_profile.set_defaults(
+        handler=lambda args: _run(
+            argparse.Namespace(
+                input=args.input,
+                output=args.output,
+                profile="max",
+                target=None,
+                outscale=None,
+                tile=args.tile,
+                tile_pad=10,
+                denoise=None,
+                fp32=False,
+                no_auto_tile=False,
+                allow_vfr=False,
+                ffmpeg_bin=args.ffmpeg_bin,
+                ffprobe_bin=args.ffprobe_bin,
+                realesrgan_dir=args.realesrgan_dir,
+                python_executable=args.python_executable,
+                crf=args.crf,
+                preset=args.preset,
+                audio_bitrate=args.audio_bitrate,
+            )
+        )
+    )
 
     preview = subparsers.add_parser("preview", help="Processa somente uma janela curta para comparação")
     preview.add_argument("input")
@@ -245,7 +301,22 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
+def normalize_argv(argv: list[str]) -> list[str]:
+    if not argv:
+        return argv
+    known_commands = {"doctor", "inspect", "run", "simple", "max", "preview", "benchmark", "-h", "--help"}
+    if argv[0] not in known_commands:
+        return ["simple", *argv]
+    return argv
+
+
+def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
-    args = parser.parse_args()
+    args_list = sys.argv[1:] if argv is None else argv
+
+    if not args_list:
+        parser.print_help()
+        raise SystemExit(0)
+
+    args = parser.parse_args(normalize_argv(args_list))
     raise SystemExit(args.handler(args))

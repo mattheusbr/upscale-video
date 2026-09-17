@@ -38,6 +38,7 @@ class UpscaleOptions:
     crf: int = 17
     preset: str = "slow"
     audio_bitrate: str = "192k"
+    audio_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -263,6 +264,7 @@ def upscale(options: UpscaleOptions) -> UpscaleResult:
                 options.preset,
                 options.audio_bitrate,
                 options.seconds,
+                options.audio_enabled,
             )
         except MediaError as exc:
             raise PipelineError(str(exc)) from exc

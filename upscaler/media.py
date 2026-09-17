@@ -198,19 +198,18 @@ def finalize_video(
     preset: str,
     audio_bitrate: str,
     seconds: float | None,
+    audio_enabled: bool = True,
 ) -> None:
     command = [
         ffmpeg_bin,
         "-y",
         "-i",
         str(upscaled_video),
-        "-i",
-        str(original_video),
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a?",
     ]
+    if audio_enabled:
+        command += ["-i", str(original_video), "-map", "0:v:0", "-map", "1:a?"]
+    else:
+        command += ["-map", "0:v:0"]
     if target:
         command += ["-vf", f"scale={target[0]}:{target[1]}:flags=lanczos"]
     command += [
@@ -222,12 +221,19 @@ def finalize_video(
         str(crf),
         "-pix_fmt",
         "yuv420p",
-        "-c:a",
-        "aac",
-        "-b:a",
-        audio_bitrate,
-        "-ar",
-        "48000",
+    ]
+    if audio_enabled:
+        command += [
+            "-c:a",
+            "aac",
+            "-b:a",
+            audio_bitrate,
+            "-ar",
+            "48000",
+        ]
+    else:
+        command += ["-an"]
+    command += [
         "-movflags",
         "+faststart",
         "-color_primaries",

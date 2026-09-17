@@ -28,6 +28,7 @@ class UpscaleOptions:
     tile_pad: int = 10
     denoise_strength: float | None = None
     fp32: bool = False
+    device: str | None = None
     auto_tile: bool = True
     seconds: float | None = None
     allow_vfr: bool = False
@@ -88,6 +89,22 @@ def _even_output_scale(width: int, height: int, requested: float) -> float:
         scale = min(candidates)
 
 
+def _visible_cuda_device(device: str | None) -> str | None:
+    if not device:
+        return None
+    value = str(device).strip().lower()
+    if not value or value in {"cpu", "cpu:0"}:
+        return None
+    if value.startswith("cuda:"):
+        value = value.split(":", 1)[1]
+    if value.startswith("cuda"):
+        value = value[4:]
+    value = value.strip(":")
+    if value and value.isdigit():
+        return value
+    return None
+
+
 def _run_realesrgan(
     source: Path,
     output_dir: Path,
@@ -140,6 +157,9 @@ def _run_realesrgan(
     child_env = os.environ.copy()
     ffmpeg_directory = str(Path(ffmpeg_bin).resolve().parent)
     child_env["PATH"] = ffmpeg_directory + os.pathsep + child_env.get("PATH", "")
+    visible_device = _visible_cuda_device(options.device)
+    if visible_device is not None:
+        child_env["CUDA_VISIBLE_DEVICES"] = visible_device
     process = subprocess.Popen(
         command,
         cwd=root,

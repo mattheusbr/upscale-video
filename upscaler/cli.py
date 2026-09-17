@@ -35,6 +35,11 @@ def _add_common_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--tile-pad", type=int, default=10)
     parser.add_argument("--denoise", type=float, help="Força de denoise do perfil compressed, entre 0 e 1")
     parser.add_argument("--fp32", action="store_true", help="Usa FP32; FP16 é o padrão para a RTX 3060 Ti")
+    parser.add_argument(
+        "--device",
+        help="Dispositivo CUDA para usar, por exemplo cuda:0, cuda:1 ou 1. Quando omitido, o projeto usa a GPU padrão.",
+    )
+    parser.add_argument("--gpu", dest="device", help=argparse.SUPPRESS)
     parser.add_argument("--no-auto-tile", action="store_true", help="Não reduzir o tile automaticamente em caso de OOM")
     parser.add_argument("--allow-vfr", action="store_true", help="Permite FPS variável com FPS nominal")
     parser.add_argument("--ffmpeg-bin", help="Caminho para ffmpeg.exe")
@@ -58,6 +63,7 @@ def _options_from_args(args: argparse.Namespace, seconds: float | None = None, o
         tile_pad=args.tile_pad,
         denoise_strength=args.denoise,
         fp32=args.fp32,
+        device=getattr(args, "device", None),
         auto_tile=not args.no_auto_tile,
         seconds=seconds,
         allow_vfr=args.allow_vfr,
@@ -151,6 +157,7 @@ def _simple(args: argparse.Namespace) -> int:
             tile_pad=10,
             denoise=None,
             fp32=False,
+            device=getattr(args, "device", None),
             no_auto_tile=False,
             allow_vfr=False,
             ffmpeg_bin=args.ffmpeg_bin,
@@ -245,6 +252,8 @@ def build_parser() -> argparse.ArgumentParser:
     simple.add_argument("--ffprobe-bin", help="Caminho para ffprobe.exe")
     simple.add_argument("--realesrgan-dir", type=Path, help="Diretório do checkout oficial do Real-ESRGAN")
     simple.add_argument("--python-executable", default=sys.executable)
+    simple.add_argument("--device", help="Dispositivo CUDA para usar, por exemplo cuda:0, cuda:1 ou 1")
+    simple.add_argument("--gpu", dest="device", help=argparse.SUPPRESS)
     simple.add_argument("--no-audio", action="store_true", help="Não re-encoda nem preserva o áudio do vídeo final")
     simple.set_defaults(handler=_simple)
 

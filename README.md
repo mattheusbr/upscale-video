@@ -79,6 +79,20 @@ Se você quiser processar só a imagem e não mexer no áudio:
 
 Isso remove a etapa de recodificação do áudio e pode ajudar um pouco no processamento, mas o vídeo final sairá sem trilha de áudio.
 
+### Escolher a GPU
+
+Se a máquina tiver mais de uma GPU, você pode escolher qual dispositivo usar:
+
+```powershell
+.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel max --device cuda:1
+```
+
+Também funciona com um índice puro:
+
+```powershell
+.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel medio --device 1
+```
+
 ## 3) Modo avançado
 
 Use `run` quando quiser controlar mais detalhes do processo:

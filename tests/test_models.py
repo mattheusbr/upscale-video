@@ -34,6 +34,10 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(args.input, "input.mp4")
         self.assertEqual(args.nivel, "alto")
 
+    def test_cli_accepts_explicit_device(self) -> None:
+        args = build_parser().parse_args(["simple", "input.mp4", "--device", "cuda:1"])
+        self.assertEqual(args.device, "cuda:1")
+
 
 if __name__ == "__main__":
     unittest.main()

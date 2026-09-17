@@ -1,0 +1,3 @@
+[submodule "vendor/Real-ESRGAN"]
+	path = vendor/Real-ESRGAN
+	url = https://github.com/mattheusbr/Real-ESRGAN.git

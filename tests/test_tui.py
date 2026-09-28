@@ -5,9 +5,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from rich.text import Text
 from textual.widgets import Button, Input, OptionList, ProgressBar, RadioSet, Sparkline, Static
 
-from upscaler.tui import ChevronPipeline, NumberedLog, UpscaleScreen, build_output_path, resolve_input_path
+from upscaler.tui import (
+    ChevronPipeline,
+    FileBrowserModal,
+    NumberedLog,
+    UpscaleScreen,
+    build_output_path,
+    resolve_input_path,
+)
 
 
 class TestTuiHelpers(unittest.TestCase):
@@ -46,18 +54,16 @@ class TestTuiScreenAsync(unittest.IsolatedAsyncioTestCase):
 
             # Widgets essenciais
             self.assertIsNotNone(app.query_one("#input-path", Input))
+            self.assertIsNotNone(app.query_one("#browse-btn", Button))
             self.assertIsNotNone(app.query_one("#profile-list", OptionList))
             self.assertIsNotNone(app.query_one("#level-set", RadioSet))
             self.assertIsNotNone(app.query_one("#audio-toggle", Button))
-            self.assertIsNotNone(app.query_one("#primary-action", Button))
-            self.assertIsNotNone(app.query_one("#progress-bar", ProgressBar))
+            self.assertIsNotNone(app.query_one("#start-btn", Button))
             self.assertIsNotNone(app.query_one("#pipeline-chevrons", ChevronPipeline))
             self.assertIsNotNone(app.query_one("#log", NumberedLog))
             self.assertIsNotNone(app.query_one("#cpu-sparkline", Sparkline))
             self.assertIsNotNone(app.query_one("#gpu-sparkline", Sparkline))
-            self.assertIsNotNone(app.query_one("#badge-ready", Static))
-            self.assertIsNotNone(app.query_one("#badge-processing", Static))
-            self.assertIsNotNone(app.query_one("#badge-complete", Static))
+            self.assertIsNotNone(app.query_one("#status-display", Static))
 
     async def test_input_path_sync(self) -> None:
         app = UpscaleScreen(input_path="input/test.mp4")
@@ -79,30 +85,67 @@ class TestTuiScreenAsync(unittest.IsolatedAsyncioTestCase):
 
             # Clica no botão de áudio
             await pilot.click("#audio-toggle")
+            await pilot.pause()
             self.assertFalse(app.audio_enabled)
             self.assertIn("com", str(btn.label).lower())
 
             # Clica novamente
             await pilot.click("#audio-toggle")
+            await pilot.pause()
             self.assertTrue(app.audio_enabled)
             self.assertIn("sem", str(btn.label).lower())
 
-    async def test_cmd_bar_commands(self) -> None:
-        app = UpscaleScreen()
+    async def test_dynamic_action_buttons(self) -> None:
+        app = UpscaleScreen(input_path="input/sample.mp4")
         async with app.run_test(size=(120, 36)) as pilot:
-            cmd = app.query_one("#cmd-input", Input)
+            start_btn = app.query_one("#start-btn", Button)
+            pause_btn = app.query_one("#pause-btn", Button)
+            stop_btn = app.query_one("#stop-btn", Button)
 
-            # Comando para trocar perfil
-            cmd.value = "compressed"
-            await pilot.click("#cmd-send")
-            await pilot.pause()
-            self.assertEqual(app.selected_profile, "compressed")
+            # Inicialmente: apenas o botão [>] Iniciar visível
+            self.assertTrue(start_btn.display)
+            self.assertFalse(pause_btn.display)
+            self.assertFalse(stop_btn.display)
 
-            # Comando para alternar áudio
-            cmd.value = "audio"
-            await pilot.click("#cmd-send")
+            # Clica em Iniciar -> deve entrar em PROCESSING
+            await pilot.click("#start-btn")
             await pilot.pause()
-            self.assertFalse(app.audio_enabled)
+            self.assertTrue(app._processing)
+            self.assertEqual(app.app_state, "PROCESSING")
+
+            # Agora deve ter botões Pausar e Parar visíveis
+            self.assertFalse(start_btn.display)
+            self.assertTrue(pause_btn.display)
+            self.assertTrue(stop_btn.display)
+            self.assertIn("Pausar", str(pause_btn.label))
+
+            # Clica em Pausar -> deve mudar label para Retomar
+            await pilot.click("#pause-btn")
+            await pilot.pause()
+            self.assertTrue(app._paused)
+            self.assertIn("Retomar", str(pause_btn.label))
+
+            # Clica em Parar -> deve voltar para [>] Iniciar e estado READY
+            await pilot.click("#stop-btn")
+            await pilot.pause()
+            self.assertFalse(app._processing)
+            self.assertEqual(app.app_state, "READY")
+            self.assertTrue(start_btn.display)
+            self.assertFalse(pause_btn.display)
+            self.assertFalse(stop_btn.display)
+
+    async def test_bracket_progress_bar_render(self) -> None:
+        app = UpscaleScreen()
+        rendered = app._render_bracket_progress_bar(51.2, 2295, 4500, 418)
+        self.assertIn("Processing Frame: [", rendered)
+        self.assertIn("51.2%", rendered)
+        self.assertIn("2295/4500", rendered)
+        self.assertIn("ETA:", rendered)
+        self.assertIn(">>>", rendered)
+
+    async def test_file_browser_modal_init(self) -> None:
+        modal = FileBrowserModal()
+        self.assertIsNotNone(modal.current_dir)
 
     async def test_numbered_log_formatting(self) -> None:
         app = UpscaleScreen()
@@ -152,18 +195,50 @@ class TestTuiScreenAsync(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(chevrons.stage, 4)
 
     async def test_visual_screenshot_capture(self) -> None:
-        app = UpscaleScreen()
+        app = UpscaleScreen(input_path=r"C:\videos\Memória_dos_Hackers.mp4")
         async with app.run_test(size=(120, 36)) as pilot:
             with tempfile.TemporaryDirectory() as tmpdir:
-                shot_path = Path(tmpdir) / "test_capture.svg"
-                app.save_screenshot(filename=str(shot_path.name), path=str(tmpdir))
-                self.assertTrue(shot_path.exists())
-                content = shot_path.read_text(encoding="utf-8")
+                svg_path = Path(tmpdir) / "test_capture.svg"
+                app.save_screenshot(filename=str(svg_path.name), path=str(tmpdir))
+                self.assertTrue(svg_path.exists())
+                content = svg_path.read_text(encoding="utf-8")
                 self.assertIn("<svg", content)
                 self.assertIn("VidiScale", content)
                 self.assertIn("Settings", content)
                 self.assertIn("Log", content)
                 self.assertIn("Monitor", content)
+
+                # Exporta para assets/screenshots
+                assets_dir = Path("assets/screenshots")
+                assets_dir.mkdir(parents=True, exist_ok=True)
+                png_path = assets_dir / "tui_screenshot.png"
+                try:
+                    import resvg_py
+                    png_bytes = resvg_py.svg_to_bytes(content)
+                    png_path.write_bytes(png_bytes)
+                    print(f"\n[TEST PRINT] Screenshot READY salvo em: {png_path.resolve()}")
+                except ImportError:
+                    pass
+
+        # Captura screenshot em estado de PROCESSING
+        app_proc = UpscaleScreen(input_path=r"...\Memória_dos_Hackers.mp4")
+        async with app_proc.run_test(size=(120, 36)) as pilot:
+            await pilot.click("#start-btn")
+            await pilot.pause()
+            app_proc.progress_value = 51
+            with tempfile.TemporaryDirectory() as tmpdir:
+                svg_path = Path(tmpdir) / "proc_capture.svg"
+                app_proc.save_screenshot(filename=str(svg_path.name), path=str(tmpdir))
+                content = svg_path.read_text(encoding="utf-8")
+                assets_dir = Path("assets/screenshots")
+                png_path = assets_dir / "tui_processing.png"
+                try:
+                    import resvg_py
+                    png_bytes = resvg_py.svg_to_bytes(content)
+                    png_path.write_bytes(png_bytes)
+                    print(f"\n[TEST PRINT] Screenshot PROCESSING salvo em: {png_path.resolve()}")
+                except ImportError:
+                    pass
 
 
 if __name__ == "__main__":

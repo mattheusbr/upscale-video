@@ -1,35 +1,50 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
+from typing import Iterable
+
 from rich.text import Text
 from textual.reactive import reactive
-from textual.widgets import RichLog, Static
+from textual.widgets import DirectoryTree, RichLog, Static
 
 
 class ChevronPipeline(Static):
-    """Renderiza as fases do pipeline em formato de chevrons coloridos (>>>>>)."""
+    """Renderiza as fases do pipeline em formato de blocos/chevrons inspirados no design do VidiScale."""
 
     stage = reactive(0)
+    spinner_idx = reactive(0)
 
-    STAGES = [
-        ("INSPEC", "#10b981", "#022c22"),
-        ("EXTRAIR", "#0284c7", "#ffffff"),
-        ("UPSCALE", "#d946ef", "#ffffff"),
-        ("ENCODE", "#334155", "#94a3b8"),
-        ("FINAL", "#1e1e38", "#c084fc"),
-    ]
+    SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+    STAGES = ["INSPEC", "EXTRAIR", "UPSCALE", "ENCODE", "FINAL"]
+
+    def on_mount(self) -> None:
+        self.set_interval(0.2, self._tick_spinner)
+
+    def _tick_spinner(self) -> None:
+        self.spinner_idx = (self.spinner_idx + 1) % len(self.SPINNER_FRAMES)
 
     def render(self) -> Text:
         t = Text()
+        spinner = self.SPINNER_FRAMES[self.spinner_idx]
         total = len(self.STAGES)
-        for idx, (name, bg, fg) in enumerate(self.STAGES):
-            if idx <= self.stage:
-                symbol = " ✓ " if idx < self.stage else (" ⠋ " if idx == total - 1 else " >>> ")
-                t.append(f" {name}{symbol}", style=f"{fg} on {bg} bold")
+
+        for idx, name in enumerate(self.STAGES):
+            if idx < self.stage:
+                # Concluído
+                t.append(f"[ {name}  ✓ ]", style="bold #022c22 on #10b981")
+            elif idx == self.stage:
+                # Ativo no momento
+                t.append(f"[ {name} {spinner} ]", style="bold #032030 on #38bdf8")
             else:
-                t.append(f" {name} >>> ", style=f"#64748b on #1e293b")
+                # Pendente
+                sym = ">>>" if idx == total - 1 else "   "
+                t.append(f"[ {name} {sym} ]", style="#64748b on #162030")
+
             if idx < total - 1:
-                t.append(" ", style="default on default")
+                t.append("  ", style="default on default")
+
         return t
 
 
@@ -71,5 +86,17 @@ class NumberedLog(RichLog):
         else:
             lvl_fmt = f"[cyan bold]{lvl:<5}[/]"
 
-        formatted = f"[dim #64748b]{self.line_number:2d}[/] [dim #38bdf8][{now}][/] {lvl_fmt}  [#e2e8f0]{message}[/]"
+        formatted = f"[dim #64748b]{self.line_number:5d}[/] [dim #38bdf8][{now}][/] {lvl_fmt}  [#e2e8f0]{message}[/]"
         self.write(formatted)
+
+
+class VideoDirectoryTree(DirectoryTree):
+    """Árvore de diretórios otimizada que exibe pastas e arquivos de vídeo suportados."""
+
+    VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".ts", ".wmv", ".m4v"}
+
+    def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
+        return [
+            p for p in paths
+            if p.is_dir() or p.suffix.lower() in self.VIDEO_EXTENSIONS
+        ]

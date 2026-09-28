@@ -39,3 +39,10 @@ class OutputPathTests(unittest.TestCase):
         path = resolve_input_path(r"C:\Users\mathe\Downloads\video.mp4")
         self.assertEqual(str(path), r"C:\Users\mathe\Downloads\video.mp4")
 
+    def test_resolve_binary_local_tools(self) -> None:
+        from upscaler.core.media import resolve_binary
+        ffmpeg = resolve_binary("ffmpeg")
+        self.assertTrue(Path(ffmpeg).exists())
+        ffprobe = resolve_binary("ffprobe")
+        self.assertTrue(Path(ffprobe).exists())
+

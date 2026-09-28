@@ -42,9 +42,10 @@ def resolve_binary(name: str, explicit: str | None = None) -> str:
     resolved = shutil.which(name)
     if resolved:
         return resolved
-    local_binary = Path(__file__).resolve().parents[1] / "tools" / "ffmpeg" / f"{name}.exe"
-    if local_binary.is_file():
-        return str(local_binary)
+    for parent in Path(__file__).resolve().parents:
+        local_binary = parent / "tools" / "ffmpeg" / f"{name}.exe"
+        if local_binary.is_file():
+            return str(local_binary)
     raise MediaError(
         f"{name} não foi encontrado no PATH. Instale FFmpeg/FFprobe ou passe o caminho com a opção correspondente."
     )

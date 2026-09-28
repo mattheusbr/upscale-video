@@ -9,6 +9,7 @@ description = "Local, quality-first video upscaling pipeline for CUDA GPUs"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "textual>=0.70.0",
+    "psutil>=7.0.0",
 ]
 
 [project.scripts]

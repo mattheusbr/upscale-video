@@ -5,6 +5,7 @@ Pillow>=10.4
 tqdm>=4.66
 ffmpeg-python>=0.2.0
 textual>=0.70.0
+psutil>=7.0.0
 
 # Real-ESRGAN's official requirements. GFPGAN is intentionally optional in
 # the first version because face restoration can hallucinate facial detail.

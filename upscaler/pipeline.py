@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,6 +41,7 @@ class UpscaleOptions:
     preset: str = "slow"
     audio_bitrate: str = "192k"
     audio_enabled: bool = True
+    progress_callback: Callable[[str], None] | None = None
 
 
 @dataclass(frozen=True)
@@ -170,14 +172,24 @@ def _run_realesrgan(
         bufsize=1,
     )
     output_chunks: list[str] = []
+    remaining = ""
     if process.stdout is not None:
         while True:
             chunk = process.stdout.read(256)
             if not chunk:
                 break
             output_chunks.append(chunk)
-            sys.stdout.write(chunk)
-            sys.stdout.flush()
+            remaining += chunk
+            while "\n" in remaining:
+                line, remaining = remaining.split("\n", 1)
+                stripped = line.strip()
+                if stripped:
+                    if options.progress_callback is not None:
+                        options.progress_callback(stripped)
+                    sys.stdout.write(stripped + "\n")
+                    sys.stdout.flush()
+    if remaining.strip() and options.progress_callback is not None:
+        options.progress_callback(remaining.strip())
     returncode = process.wait()
     combined = "".join(output_chunks)
     if returncode != 0:

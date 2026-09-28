@@ -1,238 +1,185 @@
-# Upscale Video
+<h1 align="center">Welcome to upscale-video 👋</h1>
 
-Ferramenta local para aumentar a resolução de vídeos com Real-ESRGAN e CUDA.
+<p align="center">
+  <a href="https://github.com/mattheusbr/upscale-video"><img src="https://img.shields.io/badge/version-0.2.0-38bdf8.svg?cacheSeconds=2592000" alt="version"></a>
+  <img src="https://img.shields.io/badge/python->=3.12-3776AB.svg?logo=python&logoColor=white" alt="python">
+  <img src="https://img.shields.io/badge/CUDA-12.6-76B900.svg?logo=nvidia&logoColor=white" alt="cuda">
+  <img src="https://img.shields.io/badge/AI-Real--ESRGAN-FF6F00.svg" alt="real-esrgan">
+  <img src="https://img.shields.io/badge/tests-29%20passed-10b981.svg" alt="tests">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="license"></a>
+</p>
 
-Ela foi pensada para uso simples: o comando padrão entra no modo `simple`, com nível médio por padrão, mas ainda permite controlar perfil, GPU, áudio e benchmark rapidamente.
+<p align="center">
+  <strong><a href="#english">English</a></strong> • <strong><a href="#português">Português</a></strong>
+</p>
 
-## 1) Repositórios e dependência do Real-ESRGAN
+> Local, quality-first video upscaling pipeline powered by Real-ESRGAN, CUDA, and an interactive cyberpunk terminal UI (VidiScale).
 
-Este projeto usa o fork do Real-ESRGAN como dependência externa via submodule:
+<p align="center">
+  <img src="assets/screenshots/tui_screenshot.svg" alt="VidiScale TUI" width="100%">
+</p>
 
-- projeto principal: https://github.com/mattheusbr/upscale-video
-- fork do Real-ESRGAN: https://github.com/mattheusbr/Real-ESRGAN
-- upstream original: https://github.com/xinntao/Real-ESRGAN
+---
 
-Se você clonar este projeto do zero, o submodule precisa ser inicializado:
+## English
+
+### 🏠 Homepage
+[https://github.com/mattheusbr/upscale-video](https://github.com/mattheusbr/upscale-video)
+
+### Prerequisites
+- Windows 10/11 (64-bit)
+- NVIDIA GPU with CUDA support
+- Python `>= 3.12`
+- Git (with submodule support)
+
+### Install
+Clone the repository recursively and run the bootstrap script:
 
 ```powershell
-git clone https://github.com/mattheusbr/upscale-video.git
+git clone --recurse-submodules https://github.com/mattheusbr/upscale-video.git
 cd upscale-video
-git submodule update --init --recursive
-```
-
-Se você já clonou e quiser atualizar o submodule depois:
-
-```powershell
-git pull --recurse-submodules
-git submodule update --init --recursive
-```
-
-## 2) Preparar o ambiente
-
-No PowerShell, rode:
-
-```powershell
 .\scripts\bootstrap.ps1
 ```
 
-Esse script cria o ambiente `.venv`, instala o PyTorch com CUDA 12.6, prepara o Real-ESRGAN e instala o FFmpeg/FFprobe local.
-
-Para confirmar que tudo está funcionando:
-
+Verify your environment setup:
 ```powershell
 .\.venv\Scripts\python.exe -m upscaler doctor
 ```
 
-## 3) Uso básico e modo simples
+### Usage
 
-### Modo simples padrão
-
-Se você rodar sem subcomando, o programa já entra em `simple` e usa `--nivel medio` por padrão.
-
+#### 🖥️ Interactive Terminal UI (TUI)
+Launch the cyberpunk dashboard to configure profiles and process videos with live hardware telemetry:
 ```powershell
+.\.venv\Scripts\python.exe -m upscaler tui
+```
+*(Optionally preload a video: `.\.venv\Scripts\python.exe -m upscaler tui --input video.mp4`)*
+
+#### ⚡ CLI Quick Start (Simple Mode)
+```powershell
+# Upscale using defaults (profile: clean, level: medio / 1080p)
 .\.venv\Scripts\python.exe -m upscaler input.mp4
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel baixo
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel medio
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel max
+
+# Custom profile & resolution level
+.\.venv\Scripts\python.exe -m upscaler input.mp4 --profile max --nivel alto
+
+# Benchmark before full render
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile clean --benchmark
 ```
 
-Também dá para usar o subcomando explícito:
+#### 🎛️ Profiles & Levels
 
-```powershell
-.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --nivel alto
-```
+| Profile | AI Model | Best For |
+| :--- | :--- | :--- |
+| `clean` *(default)* | `RealESRGAN_x4plus` | Real-world footage, live-action |
+| `compressed` | `realesr-general-x4v3` | Videos with artifacts and compression noise |
+| `anime` | `realesr-animevideov3` | 2D animation, cartoons, illustrations |
+| `max` | `RealESRGAN_x4plus` | Highest fidelity (heavy compute) |
 
-Níveis disponíveis:
+| Level (`--nivel`) | Max Dimension | Target Resolution |
+| :--- | :--- | :--- |
+| `baixo` | 1280 px | 720p HD |
+| `medio` *(default)* | 1920 px | 1080p Full HD |
+| `alto` | 3840 px | 4K UHD |
+| `max` | 4x native | Pure 4x model inference |
 
-- `baixo`: até 1280 px no maior lado
-- `medio`: até 1920 px no maior lado
-- `alto`: até 3840 px no maior lado
-- `max`: qualidade máxima, com saída pesada e detalhada
-
-O modo simples:
-
-- mantém a proporção do vídeo
-- não faz crop
-- não reduz a resolução original se ela já for grande
-- salva o arquivo na mesma pasta, por exemplo `input_upscaled_medio.mp4`
-
-### Perfil amigável e alias
-
-O parâmetro `--profile` aceita nomes amigáveis e também aliases do modelo:
-
-```powershell
-.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile clean --nivel medio
-.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile max --nivel max
-.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile compressed --nivel alto
-.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile anime --nivel medio
-```
-
-Aliases suportados:
-
-- `clean`, `real`, `realesr`
-- `max`, `high`, `heavy`
-- `compressed`, `general`, `general-x4v3`
-- `anime`, `anime-video`
-
-Combinações válidas:
-
-- `--profile` + `--nivel`
-- `--profile` + `--benchmark`
-- `--profile` + `--nivel` + `--benchmark`
-
-### Modelos por perfil
-
-```powershell
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --profile clean
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --profile compressed
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --profile anime
-```
-
-Mapeamento:
-
-- `clean` → `RealESRGAN_x4plus`
-- `compressed` → `realesr-general-x4v3`
-- `anime` → `realesr-animevideov3`
-- `max` → `RealESRGAN_x4plus` em qualidade máxima
-
-### Benchmark no modo simples
-
-Você pode testar rapidamente um perfil com um trecho curto antes do processamento completo:
-
-```powershell
-.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile max --nivel medio --benchmark
-.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile compressed --nivel alto --benchmark
-```
-
-Isso gera uma pasta de benchmark e um JSON com o resultado do trecho testado.
-
-### Sem áudio no vídeo final
-
-Se você quiser processar só a imagem e não mexer no áudio:
-
-```powershell
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --no-audio
-.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile anime --nivel medio --no-audio
-```
-
-### Escolher a GPU
-
-Se a máquina tiver mais de uma GPU, você pode escolher qual dispositivo usar:
-
-```powershell
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel max --device cuda:1
-```
-
-Também funciona com um índice puro:
-
-```powershell
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel medio --device 1
-```
-
-## 4) Modo avançado
-
-Use `run` quando quiser controlar mais detalhes do processo:
-
+#### 🔧 Advanced CLI Mode
 ```powershell
 .\.venv\Scripts\python.exe -m upscaler run input.mp4 output.mp4 --profile clean --tile 256 --preset slow --crf 17
 ```
 
-Aqui você pode ajustar:
-
-- perfil/modelo
-- tamanho do tile
-- CRF
-- preset do encode
-- alvo de saída
-- etc.
-
-Se quiser manter o formato original, não passe `--target`.
-
-## 5) Verificar o vídeo
-
-Para inspecionar o arquivo antes de processar:
-
+### Run tests
 ```powershell
-.\.venv\Scripts\python.exe -m upscaler inspect input.mp4
+.\.venv\Scripts\python.exe -m unittest discover tests
 ```
 
-## 6) Benchmark avançado
+---
 
-O benchmark testa um trecho curto do vídeo para comparar opções antes de processar o arquivo completo.
+## Português
+
+### 🏠 Página Inicial
+[https://github.com/mattheusbr/upscale-video](https://github.com/mattheusbr/upscale-video)
+
+### Pré-requisitos
+- Windows 10/11 (64-bit)
+- Placa de vídeo NVIDIA com suporte a CUDA
+- Python `>= 3.12`
+- Git (com suporte a submódulos)
+
+### Instalação
+Clone o repositório recursivamente e execute o script de inicialização:
 
 ```powershell
-.\.venv\Scripts\python.exe -m upscaler benchmark input.mp4 benchmark --seconds 5 --profiles clean compressed anime
+git clone --recurse-submodules https://github.com/mattheusbr/upscale-video.git
+cd upscale-video
+.\scripts\bootstrap.ps1
 ```
 
-Ele gera um relatório JSON na pasta indicada.
+Confirme se o ambiente está pronto:
+```powershell
+.\.venv\Scripts\python.exe -m upscaler doctor
+```
 
-## 7) Interface TUI
+### Uso
 
-A ferramenta também oferece uma interface interativa no terminal usando Textual:
-
+#### 🖥️ Interface Interativa de Terminal (TUI)
+Inicie o painel interativo cyberpunk com monitoramento de GPU/CPU em tempo real:
 ```powershell
 .\.venv\Scripts\python.exe -m upscaler tui
 ```
+*(Ou carregue direto com um arquivo: `.\.venv\Scripts\python.exe -m upscaler tui --input video.mp4`)*
 
-Opcionalmente você pode pré-carregar um arquivo:
-
+#### ⚡ CLI Rápido (Modo Simples)
 ```powershell
-.\.venv\Scripts\python.exe -m upscaler tui --input input.mp4
+# Upscale padrão (perfil: clean, nível: medio / 1080p)
+.\.venv\Scripts\python.exe -m upscaler input.mp4
+
+# Perfil e resolução customizados
+.\.venv\Scripts\python.exe -m upscaler input.mp4 --profile max --nivel alto
+
+# Benchmark antes do processamento completo
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile clean --benchmark
 ```
 
-A TUI permite:
+#### 🎛️ Perfis e Níveis
 
-- selecionar perfil e nível
-- visualizar o progresso em tempo real
-- iniciar o processamento com um único clique
-- acompanhar status e mensagens do pipeline
+| Perfil | Modelo de IA | Indicação |
+| :--- | :--- | :--- |
+| `clean` *(padrão)* | `RealESRGAN_x4plus` | Vídeos realistas em geral |
+| `compressed` | `realesr-general-x4v3` | Vídeos com ruído ou artefatos de compressão |
+| `anime` | `realesr-animevideov3` | Desenhos, animes e animações 2D |
+| `max` | `RealESRGAN_x4plus` | Detalhe máximo e maior fidelidade |
 
-## 8) Build e release
+| Nível (`--nivel`) | Resolução Máxima | Alvo |
+| :--- | :--- | :--- |
+| `baixo` | 1280 px | 720p HD |
+| `medio` *(padrão)* | 1920 px | 1080p Full HD |
+| `alto` | 3840 px | 4K UHD |
+| `max` | Escala nativa (4x) | Inferência direta 4x do modelo |
 
-O projeto já inclui um script de empacotamento para release:
-
+#### 🔧 Modo Avançado
 ```powershell
-.\scripts\build_release.ps1
+.\.venv\Scripts\python.exe -m upscaler run input.mp4 output.mp4 --profile clean --tile 256 --preset slow --crf 17
 ```
 
-Esse script:
-
-- cria/usa o ambiente `.venv`
-- instala as dependências de empacotamento
-- roda `python -m build`
-- produz artefatos em `dist/`
-
-Após o build, você pode distribuir o pacote gerado com o comando:
-
+### Executar testes
 ```powershell
-.\.venv\Scripts\python.exe -m pip install dist\upscale_video-*.whl
+.\.venv\Scripts\python.exe -m unittest discover tests
 ```
 
-## 9) Dicas de qualidade
+---
 
-- Use `max` para o melhor resultado geral em vídeo realista.
-- Use `compressed` para vídeos com artefatos/ruído.
-- Use `anime` para conteúdo animado.
-- O modo simples já é a opção mais fácil e segura para uso diário.
-- O processamento mostra progresso no terminal e também na TUI.
+### Author / Autor
+👤 **Matheus Bruno**
+- GitHub: [@mattheusbr](https://github.com/mattheusbr)
+
+### 🤝 Contributing / Contribuição
+Contribuições, issues e sugestões de melhorias são muito bem-vindas!  
+Sinta-se à vontade para abrir uma [issue](https://github.com/mattheusbr/upscale-video/issues).
+
+### Show your support / Apoie o projeto
+Deixe uma ⭐️ se este projeto te ajudou!
+
+### 📝 License / Licença
+Copyright © 2026 [Matheus Bruno](https://github.com/mattheusbr).  
+Distribuído sob a licença [MIT](LICENSE).

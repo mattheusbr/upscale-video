@@ -221,12 +221,14 @@ class TestTuiScreenAsync(unittest.IsolatedAsyncioTestCase):
                 # Exporta para assets/screenshots
                 assets_dir = Path("assets/screenshots")
                 assets_dir.mkdir(parents=True, exist_ok=True)
+                svg_dest = assets_dir / "tui_screenshot.svg"
+                svg_dest.write_text(content, encoding="utf-8")
                 png_path = assets_dir / "tui_screenshot.png"
                 try:
                     import resvg_py
                     png_bytes = resvg_py.svg_to_bytes(content)
                     png_path.write_bytes(png_bytes)
-                    print(f"\n[TEST PRINT] Screenshot READY salvo em: {png_path.resolve()}")
+                    print(f"\n[TEST PRINT] Screenshot READY salvo em: {png_path.resolve()} e {svg_dest.resolve()}")
                 except ImportError:
                     pass
 
@@ -241,12 +243,14 @@ class TestTuiScreenAsync(unittest.IsolatedAsyncioTestCase):
                 app_proc.save_screenshot(filename=str(svg_path.name), path=str(tmpdir))
                 content = svg_path.read_text(encoding="utf-8")
                 assets_dir = Path("assets/screenshots")
+                svg_proc_dest = assets_dir / "tui_processing.svg"
+                svg_proc_dest.write_text(content, encoding="utf-8")
                 png_path = assets_dir / "tui_processing.png"
                 try:
                     import resvg_py
                     png_bytes = resvg_py.svg_to_bytes(content)
                     png_path.write_bytes(png_bytes)
-                    print(f"\n[TEST PRINT] Screenshot PROCESSING salvo em: {png_path.resolve()}")
+                    print(f"\n[TEST PRINT] Screenshot PROCESSING salvo em: {png_path.resolve()} e {svg_proc_dest.resolve()}")
                 except ImportError:
                     pass
 

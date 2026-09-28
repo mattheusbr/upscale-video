@@ -35,6 +35,20 @@ PROFILES: dict[str, ModelProfile] = {
     ),
 }
 
+PROFILE_ALIASES: dict[str, str] = {
+    "clean": "clean",
+    "real": "clean",
+    "realesr": "clean",
+    "general": "compressed",
+    "general-x4v3": "compressed",
+    "compressed": "compressed",
+    "anime": "anime",
+    "anime-video": "anime",
+    "max": "max",
+    "heavy": "max",
+    "high": "max",
+}
+
 SIMPLE_LEVELS: dict[str, int] = {
     "baixo": 1280,
     "medio": 1920,
@@ -43,11 +57,19 @@ SIMPLE_LEVELS: dict[str, int] = {
 }
 
 
+def resolve_profile_name(name: str) -> str:
+    key = str(name).strip().lower()
+    if key in PROFILE_ALIASES:
+        return PROFILE_ALIASES[key]
+    return key
+
+
 def get_profile(name: str) -> ModelProfile:
+    profile_name = resolve_profile_name(name)
     try:
-        return PROFILES[name]
+        return PROFILES[profile_name]
     except KeyError as exc:
-        available = ", ".join(PROFILES)
+        available = ", ".join(sorted(PROFILES | {alias: PROFILES[canonical] for alias, canonical in PROFILE_ALIASES.items()}))
         raise ValueError(f"Perfil desconhecido: {name}. Use: {available}") from exc
 
 

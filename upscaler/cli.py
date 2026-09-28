@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from .media import MediaError, inspect_video, resolve_binary
-from .models import PROFILES, SIMPLE_LEVELS
+from .models import PROFILES, PROFILE_ALIASES, SIMPLE_LEVELS, resolve_profile_name
 from .pipeline import PipelineError, UpscaleOptions, ensure_output_dir, upscale
 
 
@@ -28,7 +28,8 @@ def _parse_target(value: str | None) -> tuple[int, int] | None:
 
 
 def _add_common_options(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--profile", choices=sorted(PROFILES), default="clean")
+    profile_choices = sorted(set(PROFILES) | set(PROFILE_ALIASES))
+    parser.add_argument("--profile", choices=profile_choices, default="clean", help="Perfil amigável: clean, max, compressed, anime, general, real, etc.")
     parser.add_argument("--target", type=_parse_target, help="Alvo, por exemplo 1080x1920; faz crop central para o aspecto")
     parser.add_argument("--scale", dest="outscale", type=float, help="Escala do modelo; por padrão calcula pelo target ou usa 4x")
     parser.add_argument("--tile", type=int, default=256, help="Tile inicial; 256 é um ponto de partida para 8 GB")
@@ -137,20 +138,51 @@ def _simple(args: argparse.Namespace) -> int:
     source = Path(args.input).expanduser().resolve()
     try:
         metadata = inspect_video(source, args.ffprobe_bin)
+        selected_profile = resolve_profile_name(getattr(args, "profile", "clean")) if getattr(args, "profile", None) else resolve_profile_name(getattr(args, "model", "RealESRGAN_x4plus"))
+        if getattr(args, "profile", None) is None:
+            selected_profile = resolve_profile_name(getattr(args, "model", "RealESRGAN_x4plus"))
         target_long_edge = SIMPLE_LEVELS[args.nivel]
         source_long_edge = max(metadata.width, metadata.height)
         outscale = max(1.0, min(4.0, target_long_edge / source_long_edge))
         output = source.with_name(f"{source.stem}_upscaled_{args.nivel}{source.suffix}")
-        model_to_profile = {
-            "RealESRGAN_x4plus": "clean",
-            "realesr-general-x4v3": "compressed",
-            "realesr-animevideov3": "anime",
-        }
-        profile_name = "max" if args.nivel == "max" and args.model == "RealESRGAN_x4plus" else model_to_profile[args.model]
+        if getattr(args, "profile", None) is None and hasattr(args, "model"):
+            model_to_profile = {
+                "RealESRGAN_x4plus": "clean",
+                "realesr-general-x4v3": "compressed",
+                "realesr-animevideov3": "anime",
+            }
+            selected_profile = "max" if args.nivel == "max" and args.model == "RealESRGAN_x4plus" else model_to_profile[args.model]
+        if getattr(args, "benchmark", False):
+            benchmark_dir = ensure_output_dir(Path(args.input).with_suffix("").name + "_benchmark")
+            benchmark_args = argparse.Namespace(
+                input=args.input,
+                output_dir=benchmark_dir,
+                seconds=5.0,
+                profiles=[selected_profile],
+                profile=selected_profile,
+                target=None,
+                outscale=None,
+                tile=256,
+                tile_pad=10,
+                denoise=None,
+                fp32=False,
+                no_auto_tile=False,
+                allow_vfr=False,
+                ffmpeg_bin=args.ffmpeg_bin,
+                ffprobe_bin=args.ffprobe_bin,
+                realesrgan_dir=args.realesrgan_dir,
+                python_executable=args.python_executable,
+                crf=17,
+                preset="slow",
+                audio_bitrate="320k",
+                no_audio=args.no_audio,
+            )
+            print(f"Benchmark rápido: perfil={selected_profile}, nivel={args.nivel}", flush=True)
+            return _benchmark(benchmark_args)
         simple_args = argparse.Namespace(
             input=source,
             output=output,
-            profile=profile_name,
+            profile=selected_profile,
             target=None,
             outscale=outscale,
             tile=256,
@@ -174,8 +206,8 @@ def _simple(args: argparse.Namespace) -> int:
             f"aproximadamente {int(metadata.width * outscale)}x{int(metadata.height * outscale)}",
             flush=True,
         )
-        model_name = PROFILES[profile_name].model_name
-        print(f"Perfil: {profile_name} ({model_name})", flush=True)
+        model_name = PROFILES[resolve_profile_name(selected_profile)].model_name
+        print(f"Perfil: {selected_profile} ({model_name})", flush=True)
         if args.no_audio:
             print("Áudio: sem processamento de áudio no arquivo final", flush=True)
         return _run(simple_args)
@@ -243,6 +275,12 @@ def build_parser() -> argparse.ArgumentParser:
     simple.add_argument("input")
     simple.add_argument("--nivel", choices=sorted(SIMPLE_LEVELS), default="medio")
     simple.add_argument(
+        "--profile",
+        choices=sorted(set(PROFILES) | set(PROFILE_ALIASES)),
+        default=None,
+        help="Perfil amigável: clean, max, compressed, anime, general, real, etc.",
+    )
+    simple.add_argument(
         "--model",
         choices=["RealESRGAN_x4plus", "realesr-general-x4v3", "realesr-animevideov3"],
         default="RealESRGAN_x4plus",
@@ -255,6 +293,7 @@ def build_parser() -> argparse.ArgumentParser:
     simple.add_argument("--device", help="Dispositivo CUDA para usar, por exemplo cuda:0, cuda:1 ou 1")
     simple.add_argument("--gpu", dest="device", help=argparse.SUPPRESS)
     simple.add_argument("--no-audio", action="store_true", help="Não re-encoda nem preserva o áudio do vídeo final")
+    simple.add_argument("--benchmark", action="store_true", help="Executa uma avaliação curta do perfil selecionado antes de processar o vídeo completo")
     simple.set_defaults(handler=_simple)
 
     max_profile = subparsers.add_parser("max", help="Alias para qualidade máxima usando o melhor modelo disponível")
@@ -304,16 +343,29 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("input")
     benchmark.add_argument("output_dir")
     benchmark.add_argument("--seconds", type=float, default=5.0)
-    benchmark.add_argument("--profiles", nargs="+", choices=sorted(PROFILES))
+    benchmark.add_argument("--profiles", nargs="+", choices=sorted(set(PROFILES) | set(PROFILE_ALIASES)))
     _add_common_options(benchmark)
     benchmark.set_defaults(handler=_benchmark)
+
+    tui = subparsers.add_parser("tui", help="Abre uma interface interativa em terminal usando Textual")
+    tui.add_argument("--input", help="Arquivo de entrada opcional para pré-preencher a tela")
+    tui.set_defaults(handler=lambda args: _launch_tui(args))
     return parser
+
+
+def _launch_tui(args: argparse.Namespace) -> int:
+    try:
+        from .tui import launch_tui
+    except ModuleNotFoundError as exc:
+        print("A biblioteca Textual não está instalada. Instale com: python -m pip install textual", file=sys.stderr)
+        return 2
+    return launch_tui(args.input)
 
 
 def normalize_argv(argv: list[str]) -> list[str]:
     if not argv:
         return argv
-    known_commands = {"doctor", "inspect", "run", "simple", "max", "preview", "benchmark", "-h", "--help"}
+    known_commands = {"doctor", "inspect", "run", "simple", "max", "preview", "benchmark", "tui", "-h", "--help"}
     if argv[0] not in known_commands:
         return ["simple", *argv]
     return argv

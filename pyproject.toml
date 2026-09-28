@@ -1,13 +1,15 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "upscale-video"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local, quality-first video upscaling pipeline for CUDA GPUs"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "textual>=0.70.0",
+]
 
 [project.scripts]
 upscale-video = "upscaler.cli:main"

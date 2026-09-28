@@ -38,6 +38,33 @@ class ModelTests(unittest.TestCase):
         args = build_parser().parse_args(["simple", "input.mp4", "--device", "cuda:1"])
         self.assertEqual(args.device, "cuda:1")
 
+    def test_simple_accepts_profile_and_level_together(self) -> None:
+        args = build_parser().parse_args([
+            "simple",
+            "input.mp4",
+            "--profile",
+            "compressed",
+            "--nivel",
+            "alto",
+        ])
+        self.assertEqual(args.command, "simple")
+        self.assertEqual(args.profile, "compressed")
+        self.assertEqual(args.nivel, "alto")
+
+    def test_simple_accepts_benchmark_flag_with_profile(self) -> None:
+        args = build_parser().parse_args([
+            "simple",
+            "input.mp4",
+            "--profile",
+            "max",
+            "--nivel",
+            "medio",
+            "--benchmark",
+        ])
+        self.assertTrue(args.benchmark)
+        self.assertEqual(args.profile, "max")
+        self.assertEqual(args.nivel, "medio")
+
 
 if __name__ == "__main__":
     unittest.main()

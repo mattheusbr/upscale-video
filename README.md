@@ -2,7 +2,7 @@
 
 Ferramenta local para aumentar a resolução de vídeos com Real-ESRGAN e CUDA.
 
-Ela foi pensada para uso simples: você escolhe um nível de qualidade e o programa cuida do resto.
+Ela foi pensada para uso simples: o comando padrão entra no modo `simple`, com nível médio por padrão, mas ainda permite controlar perfil, GPU, áudio e benchmark rapidamente.
 
 ## 1) Repositórios e dependência do Real-ESRGAN
 
@@ -43,20 +43,21 @@ Para confirmar que tudo está funcionando:
 .\.venv\Scripts\python.exe -m upscaler doctor
 ```
 
-## 3) Uso rápido
+## 3) Uso básico e modo simples
 
-### Modo simples (padrão)
+### Modo simples padrão
 
-Se você rodar sem subcomando, o programa já entra no modo simples automaticamente.
+Se você rodar sem subcomando, o programa já entra em `simple` e usa `--nivel medio` por padrão.
 
 ```powershell
+.\.venv\Scripts\python.exe -m upscaler input.mp4
 .\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel baixo
 .\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel medio
 .\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto
 .\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel max
 ```
 
-Você também pode usar o subcomando explícito:
+Também dá para usar o subcomando explícito:
 
 ```powershell
 .\.venv\Scripts\python.exe -m upscaler simple input.mp4 --nivel alto
@@ -67,7 +68,7 @@ Níveis disponíveis:
 - `baixo`: até 1280 px no maior lado
 - `medio`: até 1920 px no maior lado
 - `alto`: até 3840 px no maior lado
-- `max`: usa qualidade máxima com o modelo principal
+- `max`: qualidade máxima, com saída pesada e detalhada
 
 O modo simples:
 
@@ -76,21 +77,55 @@ O modo simples:
 - não reduz a resolução original se ela já for grande
 - salva o arquivo na mesma pasta, por exemplo `input_upscaled_medio.mp4`
 
-### Escolher um modelo diferente
+### Perfil amigável e alias
 
-Além do nível, você pode escolher o modelo para a versão simples:
+O parâmetro `--profile` aceita nomes amigáveis e também aliases do modelo:
 
 ```powershell
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --model RealESRGAN_x4plus
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --model realesr-general-x4v3
-.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --model realesr-animevideov3
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile clean --nivel medio
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile max --nivel max
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile compressed --nivel alto
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile anime --nivel medio
 ```
 
-Modelos disponíveis:
+Aliases suportados:
 
-- `RealESRGAN_x4plus`: melhor opção geral para vídeo realista
-- `realesr-general-x4v3`: melhor para vídeos comprimidos ou com ruído
-- `realesr-animevideov3`: melhor para anime e ilustração
+- `clean`, `real`, `realesr`
+- `max`, `high`, `heavy`
+- `compressed`, `general`, `general-x4v3`
+- `anime`, `anime-video`
+
+Combinações válidas:
+
+- `--profile` + `--nivel`
+- `--profile` + `--benchmark`
+- `--profile` + `--nivel` + `--benchmark`
+
+### Modelos por perfil
+
+```powershell
+.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --profile clean
+.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --profile compressed
+.\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --profile anime
+```
+
+Mapeamento:
+
+- `clean` → `RealESRGAN_x4plus`
+- `compressed` → `realesr-general-x4v3`
+- `anime` → `realesr-animevideov3`
+- `max` → `RealESRGAN_x4plus` em qualidade máxima
+
+### Benchmark no modo simples
+
+Você pode testar rapidamente um perfil com um trecho curto antes do processamento completo:
+
+```powershell
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile max --nivel medio --benchmark
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile compressed --nivel alto --benchmark
+```
+
+Isso gera uma pasta de benchmark e um JSON com o resultado do trecho testado.
 
 ### Sem áudio no vídeo final
 
@@ -98,9 +133,8 @@ Se você quiser processar só a imagem e não mexer no áudio:
 
 ```powershell
 .\.venv\Scripts\python.exe -m upscaler input.mp4 --nivel alto --no-audio
+.\.venv\Scripts\python.exe -m upscaler simple input.mp4 --profile anime --nivel medio --no-audio
 ```
-
-Isso remove a etapa de recodificação do áudio e pode ajudar um pouco no processamento, mas o vídeo final sairá sem trilha de áudio.
 
 ### Escolher a GPU
 
@@ -143,16 +177,7 @@ Para inspecionar o arquivo antes de processar:
 .\.venv\Scripts\python.exe -m upscaler inspect input.mp4
 ```
 
-## 6) Perfis principais
-
-Os perfis mais importantes do projeto são:
-
-- `clean`: `RealESRGAN_x4plus` para vídeo realista e limpo
-- `max`: alias para máxima qualidade usando o mesmo modelo principal
-- `compressed`: `realesr-general-x4v3` para vídeo comprimido
-- `anime`: `realesr-animevideov3` para animação
-
-## 7) Benchmark
+## 6) Benchmark avançado
 
 O benchmark testa um trecho curto do vídeo para comparar opções antes de processar o arquivo completo.
 
@@ -162,10 +187,52 @@ O benchmark testa um trecho curto do vídeo para comparar opções antes de proc
 
 Ele gera um relatório JSON na pasta indicada.
 
-## 8) Dicas de qualidade
+## 7) Interface TUI
+
+A ferramenta também oferece uma interface interativa no terminal usando Textual:
+
+```powershell
+.\.venv\Scripts\python.exe -m upscaler tui
+```
+
+Opcionalmente você pode pré-carregar um arquivo:
+
+```powershell
+.\.venv\Scripts\python.exe -m upscaler tui --input input.mp4
+```
+
+A TUI permite:
+
+- selecionar perfil e nível
+- visualizar o progresso em tempo real
+- iniciar o processamento com um único clique
+- acompanhar status e mensagens do pipeline
+
+## 8) Build e release
+
+O projeto já inclui um script de empacotamento para release:
+
+```powershell
+.\scripts\build_release.ps1
+```
+
+Esse script:
+
+- cria/usa o ambiente `.venv`
+- instala as dependências de empacotamento
+- roda `python -m build`
+- produz artefatos em `dist/`
+
+Após o build, você pode distribuir o pacote gerado com o comando:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install dist\upscale_video-*.whl
+```
+
+## 9) Dicas de qualidade
 
 - Use `max` para o melhor resultado geral em vídeo realista.
 - Use `compressed` para vídeos com artefatos/ruído.
 - Use `anime` para conteúdo animado.
 - O modo simples já é a opção mais fácil e segura para uso diário.
-- O processamento mostra progresso no terminal enquanto o vídeo vai sendo processado.
+- O processamento mostra progresso no terminal e também na TUI.

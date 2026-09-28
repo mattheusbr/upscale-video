@@ -1,0 +1,206 @@
+Screen {
+    background: #0d1117;
+    color: #e6f1ff;
+    layout: vertical;
+}
+
+#root {
+    width: 100%;
+    height: 1fr;
+    padding: 1 2 0 2;
+    layout: vertical;
+}
+
+#main {
+    width: 100%;
+    height: 1fr;
+    layout: horizontal;
+}
+
+#settings-panel {
+    width: 35%;
+    height: 100%;
+    padding: 1 2;
+    border: round #38bdf8;
+    background: #101821;
+}
+
+#right-column {
+    width: 65%;
+    height: 100%;
+    layout: vertical;
+    margin-left: 1;
+}
+
+#status-log-panel {
+    height: 75%;
+    border: round #38bdf8;
+    background: #101821;
+    padding: 1 2;
+}
+
+#performance-panel {
+    height: 25%;
+    border: round #38bdf8;
+    background: #101821;
+    padding: 1 2;
+    margin-top: 1;
+}
+
+#settings-panel:focus-within {
+    border: round #00e5ff;
+}
+
+Input, Select {
+    background: #1a222d;
+    color: #edf7ff;
+    border: round #38bdf8;
+    min-height: 3;
+    padding: 0 1;
+}
+
+Input:focus {
+    border: tall #00e5ff;
+}
+
+Select {
+    width: 100%;
+    margin: 0;
+}
+
+RadioSet {
+    border: none;
+    background: transparent;
+    padding: 0;
+    width: 100%;
+}
+
+RadioButton {
+    color: #dfeaff;
+    margin: 0;
+    padding: 0;
+}
+
+RadioButton.-on {
+    color: #00f5d4;
+    text-style: bold;
+}
+
+#audio-toggle {
+    width: 100%;
+    height: 3;
+    border: none;
+    background: #115e59;
+    color: #d1fae5;
+    text-style: bold;
+    margin-top: 1;
+}
+
+#audio-toggle.inactive {
+    background: #1f2937;
+    color: #dbeafe;
+}
+
+#primary-action {
+    width: 100%;
+    height: 3;
+    background: #00e5ff;
+    color: #000000;
+    text-style: bold;
+    border: none;
+    margin-top: 1;
+}
+
+#status-display {
+    color: #dfeaff;
+    margin-bottom: 1;
+}
+
+#progress {
+    height: 1;
+    margin: 0 0 1 0;
+}
+
+ProgressBar > .bar--bar {
+    background: #00f5d4;
+}
+
+#log {
+    height: 1fr;
+    background: transparent;
+    color: #dbeafe;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+#monitor {
+    height: 1fr;
+    layout: horizontal;
+    padding: 0;
+    background: transparent;
+}
+
+#cpu-sparkline,
+#gpu-sparkline {
+    width: 1fr;
+    height: 100%;
+    background: #0f172a;
+    border: round #20314d;
+    margin: 0 1 0 0;
+    color: #38bdf8;
+}
+
+#gpu-sparkline {
+    color: #10b981;
+}
+
+#stats-strip {
+    width: 100%;
+    height: auto;
+    layout: horizontal;
+    padding-top: 1;
+    border-top: solid #23314a;
+    color: #dfeaff;
+}
+
+.metric {
+    color: #dfeaff;
+    margin-right: 2;
+}
+
+.state-chip {
+    background: #10b981;
+    color: #02150d;
+    padding: 0 1;
+    text-style: bold;
+    margin-right: 1;
+}
+
+.state-chip.busy {
+    background: #f59e0b;
+}
+
+.state-chip.error {
+    background: #ef4444;
+    color: #fff1f2;
+}
+
+.state-chip.idle {
+    background: #334155;
+    color: #dfeaff;
+}
+
+Footer {
+    background: #0d1117;
+    color: #dfeaff;
+}
+
+Footer > .footer--key {
+    color: #f72585;
+    text-style: bold;
+}
+
+Footer > .footer--description {
+    color: #dfeaff;
+}

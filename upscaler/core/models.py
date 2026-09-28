@@ -1,0 +1,93 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ModelProfile:
+    key: str
+    model_name: str
+    description: str
+    default_denoise: float | None = None
+
+
+PROFILES: dict[str, ModelProfile] = {
+    "clean": ModelProfile(
+        key="clean",
+        model_name="RealESRGAN_x4plus",
+        description="Live-action relativamente limpo; maior detalhe e textura.",
+    ),
+    "max": ModelProfile(
+        key="max",
+        model_name="RealESRGAN_x4plus",
+        description="Qualidade máxima: usa o melhor modelo disponível em modo pesado e com encode cuidadoso.",
+    ),
+    "compressed": ModelProfile(
+        key="compressed",
+        model_name="realesr-general-x4v3",
+        description="Vídeo comprimido, ruidoso ou com artefatos; denoise controlável.",
+        default_denoise=0.5,
+    ),
+    "anime": ModelProfile(
+        key="anime",
+        model_name="realesr-animevideov3",
+        description="Animação e ilustração; não é o perfil padrão para live-action.",
+    ),
+}
+
+PROFILE_ALIASES: dict[str, str] = {
+    "clean": "clean",
+    "real": "clean",
+    "realesr": "clean",
+    "general": "compressed",
+    "general-x4v3": "compressed",
+    "compressed": "compressed",
+    "anime": "anime",
+    "anime-video": "anime",
+    "max": "max",
+    "heavy": "max",
+    "high": "max",
+}
+
+SIMPLE_LEVELS: dict[str, int] = {
+    "baixo": 1280,
+    "medio": 1920,
+    "alto": 3840,
+    "max": 3840,
+}
+
+
+def resolve_profile_name(name: str) -> str:
+    key = str(name).strip().lower()
+    if key in PROFILE_ALIASES:
+        return PROFILE_ALIASES[key]
+    return key
+
+
+def get_profile(name: str) -> ModelProfile:
+    profile_name = resolve_profile_name(name)
+    try:
+        return PROFILES[profile_name]
+    except KeyError as exc:
+        available = ", ".join(sorted(PROFILES | {alias: PROFILES[canonical] for alias, canonical in PROFILE_ALIASES.items()}))
+        raise ValueError(f"Perfil desconhecido: {name}. Use: {available}") from exc
+
+
+def tile_candidates(start: int, auto_tile: bool = True) -> list[int]:
+    if start < 32:
+        raise ValueError("tile deve ser pelo menos 32")
+    if not auto_tile:
+        return [start]
+
+    candidates = sorted(
+        {start, int(start * 0.75), start // 2, 96, 64, 32},
+        reverse=True,
+    )
+    result: list[int] = []
+    for candidate in candidates:
+        if candidate > start:
+            continue
+        candidate = max(32, candidate)
+        if candidate not in result:
+            result.append(candidate)
+    return result

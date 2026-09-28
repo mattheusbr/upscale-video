@@ -37,6 +37,16 @@ class TestTuiHelpers(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             resolve_input_path(None)
 
+    def test_version_matches_pyproject(self) -> None:
+        import tomllib
+        import upscaler
+
+        pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        with open(pyproject, "rb") as f:
+            cfg = tomllib.load(f)
+        self.assertEqual(upscaler.__version__, cfg["project"]["version"])
+
+
 
 class TestTuiScreenAsync(unittest.IsolatedAsyncioTestCase):
     async def test_tui_composition_and_mounting(self) -> None:

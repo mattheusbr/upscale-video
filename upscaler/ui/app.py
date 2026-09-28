@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import importlib.metadata
 import os
 import re
 import subprocess
@@ -7,6 +9,11 @@ import sys
 import time
 from pathlib import Path
 from typing import Optional
+
+try:
+    __version__ = importlib.metadata.version("upscale-video")
+except Exception:
+    __version__ = "0.2.0"
 
 try:
     import psutil
@@ -38,7 +45,7 @@ from textual.widgets.option_list import Option
 from ..core.media import inspect_video, resolve_binary
 from ..core.models import SIMPLE_LEVELS
 from ..core.pipeline import UpscaleOptions, upscale
-from .widgets import ChevronPipeline, GradientStatusBar, NumberedLog, VideoDirectoryTree
+from .widgets import ChevronPipeline, GradientStatusBar, MetricSparkline, NumberedLog, VideoDirectoryTree
 
 
 def build_output_path(input_path: str | Path, profile: str, level: str) -> Path:
@@ -69,6 +76,24 @@ def resolve_input_path(value: str | Path | None) -> Path:
     if not raw:
         raise FileNotFoundError("Caminho de entrada vazio")
     return Path(raw).expanduser()
+
+
+def _sample_gpu_utilization() -> int:
+    try:
+        flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        res = subprocess.run(
+            ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=1,
+            creationflags=flags,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return int(res.stdout.strip().split("\n")[0].strip())
+    except Exception:
+        pass
+    return 0
+
 
 
 class FileBrowserModal(ModalScreen[Optional[Path]]):
@@ -183,6 +208,7 @@ class UpscaleScreen(App[None]):
         self._monitor_timer = None
         self._cpu_history = [5, 8, 12, 18, 15, 25, 45, 30, 20, 15]
         self._gpu_history = [8, 12, 15, 22, 35, 50, 65, 70, 60, 55]
+        self._current_gpu = 0
         if self.input_path:
             self.output_path = build_output_path(self.input_path, "clean", "medio")
 
@@ -230,8 +256,8 @@ class UpscaleScreen(App[None]):
         with Container(id="root"):
             # Header Superior Minimalista
             with Horizontal(id="header-bar"):
-                yield Static("VidiScale  v1.0.0", id="app-brand")
-                yield Static("Status: READY  v1.0.0 ⠋", id="header-status")
+                yield Static(f"VidiScale  v{__version__}", id="app-brand")
+                yield Static(f"Status: READY  v{__version__} ⠋", id="header-status")
 
             # Layout Principal em 2 Colunas
             with Horizontal(id="main-layout"):
@@ -286,10 +312,10 @@ class UpscaleScreen(App[None]):
                         with Horizontal(id="perf-split"):
                             with Vertical(id="cpu-col", classes="perf-col"):
                                 yield Static("CPU: 0% | [                ]", id="cpu-label", classes="perf-col-title", markup=False)
-                                yield Sparkline(data=self._cpu_history, id="cpu-sparkline")
+                                yield MetricSparkline(data=self._cpu_history, id="cpu-sparkline")
                             with Vertical(id="gpu-col", classes="perf-col"):
                                 yield Static("GPU: 0% | [----------------]", id="gpu-label", classes="perf-col-title", markup=False)
-                                yield Sparkline(data=self._gpu_history, id="gpu-sparkline")
+                                yield MetricSparkline(data=self._gpu_history, id="gpu-sparkline")
 
             # Barra de Status e Rodapé
             with Horizontal(id="stats-strip"):
@@ -323,13 +349,13 @@ class UpscaleScreen(App[None]):
         log = self.query_one_optional("#log", NumberedLog)
         self.output_path = self._default_output_path()
         if log:
-            log.append_entry("INFO", "Sistema VidiScale inicializado.")
+            log.append_entry("INFO", f"Sistema VidiScale v{__version__} inicializado.")
             log.append_entry("INFO", f"Saída padrão configurada: {self.output_path}")
             log.append_entry("WARN", "Aguardando definição de vídeo de entrada.")
 
         self._sync_state_badges()
         self._refresh_monitor()
-        self._monitor_timer = self.set_interval(1.0, self._refresh_monitor)
+        self._monitor_timer = self.set_interval(1.0, self._periodic_monitor_tick)
 
     def _render_action_buttons(self) -> None:
         start_btn = self.query_one_optional("#start-btn", Button)
@@ -385,7 +411,7 @@ class UpscaleScreen(App[None]):
 
         header_status = self.query_one_optional("#header-status", Static)
         if header_status:
-            header_status.update(f"Status: {self.app_state}  v1.0.0 ⠋")
+            header_status.update(f"Status: {self.app_state}  v{__version__} ⠋")
 
         self._render_action_buttons()
         self._refresh_monitor()
@@ -479,6 +505,15 @@ class UpscaleScreen(App[None]):
                 log.append_entry("INFO", f"Nível de escala alterado para: {self.selected_level}")
             self.output_path = self._default_output_path()
 
+    async def _periodic_monitor_tick(self) -> None:
+        if not self.is_running:
+            return
+        try:
+            self._current_gpu = await asyncio.to_thread(_sample_gpu_utilization)
+        except Exception:
+            pass
+        self._refresh_monitor()
+
     def _refresh_monitor(self) -> None:
         if not self.is_running:
             return
@@ -493,21 +528,8 @@ class UpscaleScreen(App[None]):
         else:
             cpu = 18
 
-        # GPU real via nvidia-smi
-        gpu = 0
-        try:
-            flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-            res = subprocess.run(
-                ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
-                capture_output=True,
-                text=True,
-                timeout=1,
-                creationflags=flags,
-            )
-            if res.returncode == 0 and res.stdout.strip():
-                gpu = int(res.stdout.strip().split("\n")[0].strip())
-        except Exception:
-            gpu = 0
+        # GPU real via cache atualizado pelo tick periódico em thread de background
+        gpu = self._current_gpu
 
         self._cpu_history.append(cpu)
         if len(self._cpu_history) > 30:
@@ -519,11 +541,17 @@ class UpscaleScreen(App[None]):
 
         cpu_spark = self.query_one_optional("#cpu-sparkline", Sparkline)
         if cpu_spark:
-            cpu_spark.data = list(self._cpu_history)
+            if hasattr(cpu_spark, "add_value"):
+                cpu_spark.add_value(cpu)
+            else:
+                cpu_spark.data = list(self._cpu_history)
 
         gpu_spark = self.query_one_optional("#gpu-sparkline", Sparkline)
         if gpu_spark:
-            gpu_spark.data = list(self._gpu_history)
+            if hasattr(gpu_spark, "add_value"):
+                gpu_spark.add_value(gpu)
+            else:
+                gpu_spark.data = list(self._gpu_history)
 
         # Mini gauge bars
         cpu_len = 16
@@ -652,7 +680,7 @@ class UpscaleScreen(App[None]):
     def action_show_help(self) -> None:
         log = self.query_one_optional("#log", NumberedLog)
         if log:
-            log.append_entry("INFO", "Atalhos: ^s Iniciar | ^p Pausar | ^r Retomar | ^a Áudio | ^l Limpar | ^q Sair")
+            log.append_entry("INFO", f"VidiScale v{__version__} | Atalhos: ^s Iniciar | ^p Pausar | ^r Retomar | ^a Áudio | ^l Limpar | ^q Sair")
 
     def action_quit_app(self) -> None:
         now = time.monotonic()

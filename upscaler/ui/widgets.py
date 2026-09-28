@@ -6,7 +6,7 @@ from typing import Iterable
 
 from rich.text import Text
 from textual.reactive import reactive
-from textual.widgets import DirectoryTree, RichLog, Static
+from textual.widgets import DirectoryTree, RichLog, Sparkline, Static
 
 
 class ChevronPipeline(Static):
@@ -100,3 +100,74 @@ class VideoDirectoryTree(DirectoryTree):
             p for p in paths
             if p.is_dir() or p.suffix.lower() in self.VIDEO_EXTENSIONS
         ]
+
+
+class MetricSparkline(Sparkline):
+    """Sparkline de métrica contínua com escala fixa de 0 a 100%, renderização multi-linha e auto-refresh."""
+
+    BAR_TIERS = [" ", " ", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
+
+    def __init__(
+        self,
+        data: Iterable[float] | None = None,
+        *,
+        id: str | None = None,
+        classes: str | None = None,
+    ) -> None:
+        init_data = list(data) if data is not None else [0.0] * 24
+        super().__init__(data=init_data, id=id, classes=classes)
+        self._metric_data: list[float] = list(init_data)
+
+    @property
+    def data(self) -> list[float]:
+        return self._metric_data
+
+    @data.setter
+    def data(self, values: Iterable[float]) -> None:
+        self._metric_data = [float(v) for v in values]
+        self.refresh()
+
+    def add_value(self, val: float, max_len: int = 24) -> None:
+        self._metric_data.append(float(val))
+        if len(self._metric_data) > max_len:
+            self._metric_data = self._metric_data[-max_len:]
+        self.refresh()
+
+    def render(self) -> Text:
+        width = max(1, self.content_size.width or len(self._metric_data))
+        height = max(1, self.content_size.height or 1)
+        pts = self._metric_data[-width:] if len(self._metric_data) >= width else self._metric_data
+        if len(pts) < width:
+            pts = [0.0] * (width - len(pts)) + list(pts)
+
+        lines: list[Text] = []
+        for i in reversed(range(height)):
+            row_min = i * (100.0 / height)
+            row_max = (i + 1) * (100.0 / height)
+            row_text = Text()
+            for v in pts:
+                pct = max(0.0, min(100.0, float(v)))
+                if pct >= row_max:
+                    char = "█"
+                elif pct <= row_min:
+                    char = " " if i > 0 else " "
+                else:
+                    ratio = (pct - row_min) / (row_max - row_min)
+                    idx = int(round(ratio * (len(self.BAR_TIERS) - 1)))
+                    char = self.BAR_TIERS[idx]
+
+                if pct >= 80:
+                    style = "bold #ef4444"
+                elif pct >= 50:
+                    style = "#fbbf24"
+                elif pct >= 20:
+                    style = "#38bdf8"
+                elif pct > 0:
+                    style = "#0284c7"
+                else:
+                    style = "#1e293b" if i == 0 else "default"
+                row_text.append(char, style=style)
+            lines.append(row_text)
+
+        return Text("\n").join(lines)
+

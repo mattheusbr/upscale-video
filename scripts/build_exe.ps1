@@ -40,6 +40,7 @@ $PyInstallerArgs = @(
     "--collect-all", "realesrgan",
     "--collect-all", "facexlib",
     "--collect-all", "textual",
+    "--collect-all", "ffmpeg",
     "--collect-all", "cv2",
     "--add-data", "vendor\Real-ESRGAN;vendor\Real-ESRGAN",
     "--add-data", "upscaler\ui\tui.tcss;upscaler\ui"

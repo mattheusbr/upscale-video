@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .media import MediaError, inspect_video, resolve_binary
 from .models import PROFILES, PROFILE_ALIASES, SIMPLE_LEVELS, resolve_profile_name
-from .pipeline import PipelineError, UpscaleOptions, ensure_output_dir, upscale
+from .pipeline import PipelineError, UpscaleOptions, _default_realesrgan_dir, ensure_output_dir, upscale
 
 
 def _parse_target(value: str | None) -> tuple[int, int] | None:
@@ -105,7 +105,7 @@ def _doctor(args: argparse.Namespace) -> int:
             print(f"{binary}: {resolve_binary(binary)}")
         except MediaError:
             print(f"{binary}: ausente")
-    realesrgan = (args.realesrgan_dir or Path("vendor/Real-ESRGAN")).resolve()
+    realesrgan = (args.realesrgan_dir or _default_realesrgan_dir()).resolve()
     print(f"Real-ESRGAN: {realesrgan / 'inference_realesrgan_video.py'}")
     return 0
 

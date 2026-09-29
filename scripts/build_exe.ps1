@@ -42,6 +42,9 @@ $PyInstallerArgs = @(
     "--collect-all", "textual",
     "--collect-all", "ffmpeg",
     "--collect-all", "cv2",
+    "--hidden-import", "socket",
+    "--hidden-import", "_socket",
+    "--hidden-import", "multiprocessing",
     "--add-data", "vendor\Real-ESRGAN;vendor\Real-ESRGAN",
     "--add-data", "upscaler\ui\tui.tcss;upscaler\ui"
 )
@@ -52,6 +55,13 @@ elseif (-not $SkipFfmpeg) {
     throw "FFmpeg não encontrado. Instale-o ou use -SkipFfmpeg para depender do PATH do sistema."
 }
 $PyInstallerArgs += "upscale_entry.py"
+
+$ExistingExe = Join-Path $Root "dist\upscale\upscale.exe"
+$RunningBuild = Get-Process -Name "upscale" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -and $_.Path -eq $ExistingExe }
+if ($RunningBuild) {
+    throw "Feche o upscale.exe que está aberto antes de gerar uma nova versão: $ExistingExe"
+}
 
 & $VenvPython -m PyInstaller @PyInstallerArgs
 if ($LASTEXITCODE -ne 0) {

@@ -57,6 +57,10 @@ def _default_realesrgan_dir() -> Path:
     configured = os.environ.get("REAL_ESRGAN_DIR")
     if configured:
         return Path(configured).expanduser().resolve()
+    if getattr(sys, "frozen", False):
+        bundled = Path(sys.executable).resolve().parent / "vendor" / "Real-ESRGAN"
+        if bundled.is_dir():
+            return bundled
     for parent in Path(__file__).resolve().parents:
         candidate = parent / "vendor" / "Real-ESRGAN"
         if candidate.is_dir():
@@ -127,13 +131,14 @@ def _run_realesrgan(
             f"Script do Real-ESRGAN não encontrado: {script}. Execute scripts\\bootstrap.ps1 ou passe --realesrgan-dir."
         )
 
-    compatibility_runner = Path(__file__).with_name("runner.py")
-    if not compatibility_runner.is_file():
-        compatibility_runner = Path(__file__).resolve().parents[1] / "realesrgan_runner.py"
-    command = [
-        options.python_executable,
-        str(compatibility_runner),
-        str(script),
+    if getattr(sys, "frozen", False):
+        command = [options.python_executable, "--_upscale-worker", str(script)]
+    else:
+        compatibility_runner = Path(__file__).with_name("runner.py")
+        if not compatibility_runner.is_file():
+            compatibility_runner = Path(__file__).resolve().parents[1] / "realesrgan_runner.py"
+        command = [options.python_executable, str(compatibility_runner), str(script)]
+    command += [
         "-i",
         str(source),
         "-o",

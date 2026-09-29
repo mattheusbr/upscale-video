@@ -44,6 +44,20 @@ Confirm that all system dependencies and GPU drivers are ready:
 .\.venv\Scripts\python.exe -m upscaler doctor
 ```
 
+### Build the Windows executable
+With Python 3.12 installed and the Real-ESRGAN submodule initialized, build the distributable with:
+```powershell
+git submodule update --init --recursive
+.\scripts\build_exe.ps1
+```
+The output is in `dist\upscale\`. Distribute the **entire folder**, not just `upscale.exe` — it contains the CUDA runtime, models, Real-ESRGAN, and FFmpeg.
+
+```powershell
+.\dist\upscale\upscale.exe tui
+.\dist\upscale\upscale.exe video.mp4
+.\dist\upscale\upscale.exe doctor
+```
+
 ### Usage
 
 #### 🖥️ Interactive Terminal UI (TUI)

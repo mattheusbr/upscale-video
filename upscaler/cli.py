@@ -372,8 +372,19 @@ def normalize_argv(argv: list[str]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = build_parser()
     args_list = sys.argv[1:] if argv is None else argv
+
+    # The frozen executable acts as its own Python worker for Real-ESRGAN.
+    # This keeps CUDA/PyTorch imports in the packaged runtime instead of
+    # requiring a separately installed Python interpreter.
+    if args_list and args_list[0] == "--_upscale-worker":
+        from .core.runner import main as run_worker
+
+        sys.argv = [sys.argv[0], *args_list[1:]]
+        run_worker()
+        return
+
+    parser = build_parser()
 
     if not args_list:
         parser.print_help()

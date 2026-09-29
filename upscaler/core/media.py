@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
@@ -42,6 +43,10 @@ def resolve_binary(name: str, explicit: str | None = None) -> str:
     resolved = shutil.which(name)
     if resolved:
         return resolved
+    if getattr(sys, "frozen", False):
+        bundled_binary = Path(sys.executable).resolve().parent / "tools" / "ffmpeg" / f"{name}.exe"
+        if bundled_binary.is_file():
+            return str(bundled_binary)
     for parent in Path(__file__).resolve().parents:
         local_binary = parent / "tools" / "ffmpeg" / f"{name}.exe"
         if local_binary.is_file():

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from functools import partial
 import importlib.metadata
 import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -204,6 +206,8 @@ class UpscaleScreen(App[None]):
         self._last_ctrl_c = 0.0
         self._processing = False
         self._paused = False
+        self._cancel_requested = threading.Event()
+        self._active_process: subprocess.Popen[str] | None = None
         self._processing_started_at = 0.0
         self._monitor_timer = None
         self._cpu_history = [5, 8, 12, 18, 15, 25, 45, 30, 20, 15]
@@ -619,6 +623,8 @@ class UpscaleScreen(App[None]):
 
         self._processing = True
         self._paused = False
+        self._cancel_requested.clear()
+        self._active_process = None
         self._processing_started_at = time.time()
         self.app_state = "PROCESSING"
 
@@ -632,6 +638,96 @@ class UpscaleScreen(App[None]):
             log.append_entry("INFO", f"Destino: {out_path}")
             log.append_entry("INFO", f"Configuração: {self.selected_profile} @ {self.selected_level} (Áudio: {self.audio_enabled})")
 
+        self._sync_state_badges()
+
+        self.run_worker(
+            partial(
+                self._process_video,
+                in_path,
+                out_path,
+                self.selected_profile,
+                self.selected_level,
+                self.audio_enabled,
+            ),
+            thread=True,
+            exclusive=True,
+            name="upscale-video",
+        )
+
+    def _process_video(
+        self,
+        input_path: Path,
+        output_path: Path,
+        profile: str,
+        level: str,
+        mute_audio: bool,
+    ) -> None:
+        """Run the blocking video pipeline in a Textual worker thread."""
+        try:
+            metadata = inspect_video(input_path)
+            if level == "max":
+                outscale = 4.0
+            else:
+                target_edge = SIMPLE_LEVELS[level]
+                source_edge = max(metadata.width, metadata.height)
+                outscale = max(1.0, min(4.0, target_edge / source_edge))
+
+            self._report_pipeline_log(
+                f"Vídeo: {metadata.width}x{metadata.height}; escala selecionada: {outscale:.2f}x"
+            )
+            options = UpscaleOptions(
+                input_path=input_path,
+                output_path=output_path,
+                profile=profile,
+                outscale=outscale,
+                audio_enabled=not mute_audio,
+                python_executable=sys.executable,
+                progress_callback=self._report_pipeline_log,
+                process_callback=self._track_pipeline_process,
+            )
+            result = upscale(options)
+            self.call_from_thread(self._finish_processing, result, None)
+        except Exception as exc:
+            cancelled = self._cancel_requested.is_set()
+            message = "Processamento cancelado." if cancelled else str(exc)
+            try:
+                self.call_from_thread(self._finish_processing, None, message)
+            except RuntimeError:
+                pass
+
+    def _report_pipeline_log(self, message: str) -> None:
+        try:
+            self.call_from_thread(self._append_pipeline_log, message)
+        except RuntimeError:
+            pass
+
+    def _append_pipeline_log(self, message: str) -> None:
+        log = self.query_one_optional("#log", NumberedLog)
+        if log:
+            log.append_entry("INFO", message)
+
+    def _track_pipeline_process(self, process: subprocess.Popen[str] | None) -> None:
+        self._active_process = process
+        if process is not None and self._cancel_requested.is_set():
+            process.terminate()
+
+    def _finish_processing(self, result: object | None, error: str | None) -> None:
+        self._active_process = None
+        self._processing = False
+        self._paused = False
+        self._processing_started_at = 0.0
+        if error:
+            self.app_state = "READY" if self._cancel_requested.is_set() else "ERROR"
+            level = "WARN" if self._cancel_requested.is_set() else "ERROR"
+            message = error
+        else:
+            self.app_state = "COMPLETE"
+            level = "INFO"
+            message = f"Upscale concluído: {getattr(result, 'output_path', '')}"
+            self.progress_value = 100
+        log = self.query_one_optional("#log", NumberedLog)
+        if log:
+            log.append_entry(level, message)
         self._sync_state_badges()
 
     def action_pause_processing(self) -> None:
@@ -650,12 +746,17 @@ class UpscaleScreen(App[None]):
         if not self._processing:
             return
 
+        self._cancel_requested.set()
+        process = self._active_process
+        if process is not None and process.poll() is None:
+            process.terminate()
         self._processing = False
         self._paused = False
+        self._processing_started_at = 0.0
         self.app_state = "READY"
         log = self.query_one_optional("#log", NumberedLog)
         if log:
-            log.append_entry("WARN", "Processamento interrompido pelo usuário.")
+            log.append_entry("WARN", "Solicitando cancelamento do processamento...")
         self._sync_state_badges()
 
     def _mark_error(self, message: str) -> None:

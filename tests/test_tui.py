@@ -4,6 +4,8 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from rich.text import Text
 from textual.widgets import Button, Input, OptionList, ProgressBar, RadioSet, Sparkline, Static
@@ -107,42 +109,67 @@ class TestTuiScreenAsync(unittest.IsolatedAsyncioTestCase):
 
     async def test_dynamic_action_buttons(self) -> None:
         app = UpscaleScreen(input_path="input/sample.mp4")
-        async with app.run_test(size=(120, 36)) as pilot:
-            start_btn = app.query_one("#start-btn", Button)
-            pause_btn = app.query_one("#pause-btn", Button)
-            stop_btn = app.query_one("#stop-btn", Button)
+        with patch.object(app, "_process_video", return_value=None) as worker:
+            async with app.run_test(size=(120, 36)) as pilot:
+                start_btn = app.query_one("#start-btn", Button)
+                pause_btn = app.query_one("#pause-btn", Button)
+                stop_btn = app.query_one("#stop-btn", Button)
 
-            # Inicialmente: apenas o botão [>] Iniciar visível
-            self.assertTrue(start_btn.display)
-            self.assertFalse(pause_btn.display)
-            self.assertFalse(stop_btn.display)
+                # Inicialmente: apenas o botão [>] Iniciar visível
+                self.assertTrue(start_btn.display)
+                self.assertFalse(pause_btn.display)
+                self.assertFalse(stop_btn.display)
 
-            # Clica em Iniciar -> deve entrar em PROCESSING
-            await pilot.click("#start-btn")
-            await pilot.pause()
-            self.assertTrue(app._processing)
-            self.assertEqual(app.app_state, "PROCESSING")
+                # Clica em Iniciar -> deve iniciar o worker de processamento
+                await pilot.click("#start-btn")
+                await pilot.pause()
+                self.assertTrue(app._processing)
+                self.assertEqual(app.app_state, "PROCESSING")
+                worker.assert_called_once()
 
-            # Agora deve ter botões Pausar e Parar visíveis
-            self.assertFalse(start_btn.display)
-            self.assertTrue(pause_btn.display)
-            self.assertTrue(stop_btn.display)
-            self.assertIn("Pausar", str(pause_btn.label))
+                # Agora deve ter botões Pausar e Parar visíveis
+                self.assertFalse(start_btn.display)
+                self.assertTrue(pause_btn.display)
+                self.assertTrue(stop_btn.display)
+                self.assertIn("Pausar", str(pause_btn.label))
 
-            # Clica em Pausar -> deve mudar label para Retomar
-            await pilot.click("#pause-btn")
-            await pilot.pause()
-            self.assertTrue(app._paused)
-            self.assertIn("Retomar", str(pause_btn.label))
+                # Clica em Pausar -> deve mudar label para Retomar
+                await pilot.click("#pause-btn")
+                await pilot.pause()
+                self.assertTrue(app._paused)
+                self.assertIn("Retomar", str(pause_btn.label))
 
-            # Clica em Parar -> deve voltar para [>] Iniciar e estado READY
-            await pilot.click("#stop-btn")
-            await pilot.pause()
-            self.assertFalse(app._processing)
-            self.assertEqual(app.app_state, "READY")
-            self.assertTrue(start_btn.display)
-            self.assertFalse(pause_btn.display)
-            self.assertFalse(stop_btn.display)
+                # Clica em Parar -> solicita o cancelamento e volta a READY
+                await pilot.click("#stop-btn")
+                await pilot.pause()
+                self.assertFalse(app._processing)
+                self.assertEqual(app.app_state, "READY")
+                self.assertTrue(start_btn.display)
+                self.assertFalse(pause_btn.display)
+                self.assertFalse(stop_btn.display)
+
+    async def test_start_processing_runs_upscale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "input.mp4"
+            source.touch()
+            expected_output = Path(tmpdir) / "clean_medio_input.mp4"
+            app = UpscaleScreen(input_path=str(source))
+            fake_result = SimpleNamespace(output_path=expected_output)
+            with (
+                patch("upscaler.ui.app.inspect_video", return_value=SimpleNamespace(width=1280, height=720)),
+                patch("upscaler.ui.app.upscale", return_value=fake_result) as run_upscale,
+            ):
+                async with app.run_test(size=(120, 36)) as pilot:
+                    await pilot.click("#start-btn")
+                    for _ in range(20):
+                        if app.app_state == "COMPLETE":
+                            break
+                        await pilot.pause(0.05)
+                    self.assertEqual(app.app_state, "COMPLETE")
+                    run_upscale.assert_called_once()
+                    options = run_upscale.call_args.args[0]
+                    self.assertEqual(options.outscale, 1.5)
+                    self.assertFalse(options.audio_enabled)
 
     async def test_bracket_progress_bar_render(self) -> None:
         app = UpscaleScreen()
@@ -234,6 +261,7 @@ class TestTuiScreenAsync(unittest.IsolatedAsyncioTestCase):
 
         # Captura screenshot em estado de PROCESSING
         app_proc = UpscaleScreen(input_path=r"...\Memória_dos_Hackers.mp4")
+        app_proc._process_video = lambda *args: None
         async with app_proc.run_test(size=(120, 36)) as pilot:
             await pilot.click("#start-btn")
             await pilot.pause()

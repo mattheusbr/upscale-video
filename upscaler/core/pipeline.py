@@ -42,6 +42,7 @@ class UpscaleOptions:
     audio_bitrate: str = "192k"
     audio_enabled: bool = True
     progress_callback: Callable[[str], None] | None = None
+    process_callback: Callable[[subprocess.Popen[str] | None], None] | None = None
 
 
 @dataclass(frozen=True)
@@ -182,6 +183,8 @@ def _run_realesrgan(
         text=True,
         bufsize=1,
     )
+    if options.process_callback is not None:
+        options.process_callback(process)
     output_chunks: list[str] = []
     remaining = ""
     if process.stdout is not None:
@@ -202,6 +205,8 @@ def _run_realesrgan(
     if remaining.strip() and options.progress_callback is not None:
         options.progress_callback(remaining.strip())
     returncode = process.wait()
+    if options.process_callback is not None:
+        options.process_callback(None)
     combined = "".join(output_chunks)
     if returncode != 0:
         raise PipelineError(combined.strip() or "Real-ESRGAN falhou sem mensagem")

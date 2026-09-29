@@ -625,6 +625,7 @@ class UpscaleScreen(App[None]):
         self._paused = False
         self._cancel_requested.clear()
         self._active_process = None
+        self.progress_value = 0
         self._processing_started_at = time.time()
         self.app_state = "PROCESSING"
 

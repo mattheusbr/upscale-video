@@ -121,10 +121,12 @@ class TestTuiScreenAsync(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(stop_btn.display)
 
                 # Clica em Iniciar -> deve iniciar o worker de processamento
+                app.progress_value = 100
                 await pilot.click("#start-btn")
                 await pilot.pause()
                 self.assertTrue(app._processing)
                 self.assertEqual(app.app_state, "PROCESSING")
+                self.assertEqual(app.progress_value, 0)
                 worker.assert_called_once()
 
                 # Agora deve ter botões Pausar e Parar visíveis
